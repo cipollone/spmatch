@@ -7,7 +7,6 @@
 #include <CImg.h>
 
 using std::string;
-using std::unique_ptr;
 using namespace cimg_library;
 
 
@@ -17,7 +16,7 @@ class Image {
 
 		string imgPath;
 
-		unique_ptr<CImg<double>> img;   // NOTE: using double type for pixels
+		CImg<double> img;            // NOTE: using double type for pixels
 
 		int width;
 		int height;
@@ -25,12 +24,15 @@ class Image {
 
 	public:
 
+		// constr
 		Image(const string& imgPath);
 		Image(const Image&) = delete;     // no copies
-		Image(Image&& i) = default;
+		Image(Image&&) = default;         // move: allows to return images
 
+		// functions
 		void display(string windowName="");
 
+		// operators
 		Image& operator=(const Image&) = delete;
 		friend std::ostream& operator<<(std::ostream& o, const Image& i);
 
@@ -39,8 +41,15 @@ class Image {
 
 class StereoImage: public Image {
 
+	private:
+
+		// TODO: a grid of planes
+
+
+
 	public:
 
+		// constr
 		StereoImage(const string& imgPath): Image(imgPath) {}
 
 };
@@ -55,11 +64,16 @@ class StereoImagePair {
 
 	public:
 
+		// constr
 		StereoImagePair(const string& leftImgPath, const string& rightImgPath):
 				leftImg(leftImgPath), rightImg(rightImgPath) {}
 
+		
+		// functions
 		void displayBoth(void);
+		Image computeDisparity(void);
 
+		// ops
 		friend std::ostream& operator<<(std::ostream& o, const StereoImagePair& p);
 
 };

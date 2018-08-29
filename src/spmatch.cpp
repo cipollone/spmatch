@@ -16,6 +16,7 @@
 
 #include "image.hpp"
 
+
 namespace optionsLib = boost::program_options;
 using std::string;
 
@@ -37,8 +38,13 @@ void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
 	StereoImagePair stereo(leftImgPath, rightImgPath);
 
 	// Run the algorithm
+	Image disparity = stereo.computeDisparity();
 	
 	// Write the result
+	// TODO
+	
+	// TODO: remove this
+	disparity.display("Disparity");
 
 }
 

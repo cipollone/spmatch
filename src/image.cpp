@@ -9,8 +9,8 @@
 * Constructs and image from a file path. *
 *****************************************/
 Image::Image(const string& imgPath):
-		imgPath(imgPath), img(new CImg<double>(imgPath.c_str())),
-		width(img->width()), height(img->height()), channels(img->spectrum()) {
+		imgPath(imgPath), img(imgPath.c_str()),
+		width(img.width()), height(img.height()), channels(img.spectrum()) {
 	
 	if (channels != 1 || channels != 3 || channels != 4) {
 		std::runtime_error("Wrong image format. Grayscale, RGB, RGBA supported");
@@ -26,8 +26,7 @@ Image::Image(const string& imgPath):
 *   windowName (string): the title of the window *
 *************************************************/
 void Image::display(string windowName) {
-	CImgDisplay disp;
-	disp.display(*img);
+	CImgDisplay disp(img, windowName.c_str());
 	while (!disp.is_closed()) {
 		disp.wait();
 	}
@@ -52,6 +51,21 @@ void StereoImagePair::displayBoth(void) {
 	leftImg.display("Left image");
 	rightImg.display("Right image");
 }
+
+
+/********************************************************************
+* > computeDisparity()                                              *
+* Computes the disparity map of the two images using the PatchMatch *
+* Stereo algorithm.                                                 *
+*                                                                   *
+* Returns:                                                          *
+*   (Image): the disparity map                                      *
+********************************************************************/
+Image StereoImagePair::computeDisparity(void) {
+	// TODO: remove the placeholder
+	return Image("../tests/cones/all.png");
+}
+
 
 // print
 std::ostream& operator<<(std::ostream& out, const StereoImagePair& pair) {
