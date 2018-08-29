@@ -14,37 +14,64 @@
 #include <fstream>
 #include <boost/program_options.hpp>
 
-namespace optionslib = boost::program_options;
+#include "image.hpp"
+
+namespace optionsLib = boost::program_options;
 using std::string;
 
 
+/**************************************************************************
+* > writeDisparityMap()                                                   *
+* Given a pair of stereo images, saves the generated disparity map to the *
+* ouput path.                                                             *
+*                                                                         *
+* Args:                                                                   *
+*   leftImgPath (string): left image name/path                            *
+*   rightImgPath (string): right image name/path                          *
+*   disparityPath (string): output image name/path                        *
+**************************************************************************/
+void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
+		const string& disparityPath) {
+
+	// Read the two stereo images
+	StereoImagePair stereo(leftImgPath, rightImgPath);
+
+	// Run the algorithm
+	
+	// Write the result
+
+}
+
+
+// main
 int main(int argc, char *argv[]) {
 
-	// Parsing the command line
-	optionslib::options_description optDescription("SPMatch. "
+	// parsing the command line
+	optionsLib::options_description optDescription("SPMatch. "
 			"Stereo matching with slanted support windows");
 
-	// Defining the options
 	optDescription.add_options()
 			("help,h", "Help")
-			("stereo-images", optionslib::value<std::vector<string>>()->required(),
-			"The left and right input images");
-	optionslib::positional_options_description posOptDescription;
+			("stereo-images", optionsLib::value<std::vector<string>>()->required(),
+			"The left and right input images")
+			("output,o", optionsLib::value<string>(), "Output file")
+	;
+	optionsLib::positional_options_description posOptDescription;
 	posOptDescription.add("stereo-images", 2);
 
-	// Parsing
-	optionslib::variables_map vMap;
-	optionslib::store(optionslib::command_line_parser(argc, argv)
+	optionsLib::variables_map vMap;
+	optionsLib::store(optionsLib::command_line_parser(argc, argv)
 			.options(optDescription).positional(posOptDescription).run(),
 			vMap);
-	optionslib::notify(vMap);
+	optionsLib::notify(vMap);
 
+	// help param
 	if (vMap.count("help")) {
 		std::cout << optDescription << std::endl;
 		return 1;
 	}
 
-	// Read the images path
+	// images param
 	std::vector<string> imagesPath = vMap["stereo-images"]
 			.as<std::vector<string>>();
 	if (imagesPath.size() < 2) {		// enough?
@@ -57,5 +84,22 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	// output param
+	string outputPath;
+
+	size_t dotPos = imagesPath[0].find_last_of('.');
+	string leftImageName = imagesPath[0].substr(0,dotPos);
+	string leftImageExt = (dotPos < imagesPath[0].length()) ?
+			imagesPath[0].substr(dotPos) : "";
+	outputPath = leftImageName + "_disparity" + leftImageExt;
+
+	if (vMap.count("output")) {
+		outputPath = vMap["output"].as<string>();
+	}
+
+	// run
+	writeDisparityMap(imagesPath[0],  imagesPath[1], outputPath);
+
 	return 1;
 }
+
