@@ -1,10 +1,12 @@
 # configs
 set(DEBUGGING true)
-set(CPP_SOURCES src/spmatch.cpp src/image.cpp src/utils.cpp)
-set(CPP_SOURCES_DEB src/debug.cpp src/image.cpp src/utils.cpp)
+set(CPP_SOURCES src/spmatch.cpp src/image.cpp src/geometry.cpp)
+set(CPP_SOURCES_DEB src/debug.cpp src/image.cpp src/geometry.cpp)
 
 # Requirements
 cmake_minimum_required(VERSION 3.7.2)
+
+find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 
 # Project settings
 project(SPMatch)	# project name
@@ -26,11 +28,12 @@ include_directories(include)
 
 # main source
 add_executable(spmatch ${CPP_SOURCES})
-
 target_link_libraries(spmatch boost_program_options)
 target_link_libraries(spmatch X11) # Linux/iOS specific
+target_link_libraries(spmatch Eigen3::Eigen)
 
 # testing
 add_executable(spmatch_deb ${CPP_SOURCES_DEB})
 target_link_libraries(spmatch_deb boost_program_options)
 target_link_libraries(spmatch_deb X11) # Linux/iOS specific
+target_link_libraries(spmatch_deb Eigen3::Eigen)

@@ -1,27 +1,43 @@
 
 #pragma once
 
+#include <iostream>
+#include <cmath>
+#include <Eigen/Core>
 
-/*********************************************************************
-* > class Plane                                                      *
-* The representation of the plane both as the geometric object in 3D *
-* space and as a 2D numeric interpolation.                           *
-*********************************************************************/
+
+using Eigen::Vector3d;
+using std::pair;
+
+
+/*****************************************************************************
+* > class Plane                                                              *
+* The representation of a plane in 3D spaces. See the comments in .cpp file. *
+*****************************************************************************/
 class Plane {
 	
 	private:
 
 		// plane coefficients
-		double a;
-		double b;
-		double c;
-
+		Vector3d abc;
+		double d;
 
 	public:
 
-		Plane(double a, double b, double c):
-				a(a), b(b), c(c) {}
+		// construct
+		//Plane(void): abc(1,0,0), d(0) {}
+		Plane(double a, double b, double c, double d);
 
-		Plane(void): Plane(0,0,0) {}
+		// const methods
+		pair<Vector3d, double> getParams(void) const { return {abc, d}; }
+		double distanceOfPoint(const Vector3d& point) const;
+		pair<Vector3d, Vector3d> toPointAndNorm(void) const;
+
+		// other methods
+		Plane& setPlane(const Vector3d& abc, double d);
+		Plane& fromPointAndNorm(const Vector3d& point, const Vector3d& norm);
+
+		// operator
+		friend std::ostream& operator<<(std::ostream& out, const Plane& p);
 
 };

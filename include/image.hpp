@@ -10,6 +10,10 @@ using std::string;
 using namespace cimg_library;
 
 
+/************************************
+* > class Image                     *
+* A wrapper class for the CImg type *
+************************************/
 class Image {
 
 	private:
@@ -55,6 +59,11 @@ class StereoImage: public Image {
 };
 
 
+/***************************************
+* > class StereoImagePair              *
+* Represents a couple of StereoImages. *
+* See .cpp file                        *
+***************************************/
 class StereoImagePair {
 	
 	private:
