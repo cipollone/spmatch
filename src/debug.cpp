@@ -4,7 +4,6 @@
 #include <string>
 
 #include "geometry.hpp"
-#include "utils.hpp"
 
 
 using std::cout;
@@ -15,8 +14,15 @@ int main(int argc, char** argv) {
 
 	cout << "Just testing here!" << endl;
 
-	// testing the Grid class with Plane s
-	Grid<double> grid2(3,4,3.3);
+	// Testing PlaneFunction
+	PlaneFunction f2(1,-1,3);
+	cout << f2 << endl;
 
-	cout << grid2;
+	cout << f2(0,0) << endl;
+	cout << f2(1,1) << endl;
+	cout << f2(1,-1) << endl;
+
+	auto p = f2.toPointAndNorm();
+	cout << p.first.transpose() << ", " << p.second.transpose() << endl;
+
 }

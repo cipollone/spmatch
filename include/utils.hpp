@@ -4,6 +4,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <random>
 
 
 using std::string;
@@ -66,3 +67,15 @@ std::ostream& operator<<(std::ostream& o, const Grid<T>& g) {
 	}
 	return o;
 }
+
+
+/**************************
+* > class RandomDevice    *
+* A global random device  *
+**************************/
+class RandomDevice {
+
+	public:
+		std::random_device rndDev;
+};
+

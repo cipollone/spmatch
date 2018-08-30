@@ -13,7 +13,8 @@ Image::Image(const string& imgPath):
 		width(img.width()), height(img.height()), channels(img.spectrum()) {
 	
 	if (channels != 1 || channels != 3 || channels != 4) {
-		std::runtime_error("Wrong image format. Grayscale, RGB, RGBA supported");
+		throw std::runtime_error(
+				"Wrong image format. Grayscale, RGB, RGBA supported");
 	}
 }
 
