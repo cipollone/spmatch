@@ -12,10 +12,12 @@ using Eigen::Vector3d;
 using std::pair;
 
 
-/*****************************************************************************
-* > class Plane                                                              *
-* The representation of a plane in 3D spaces. See the comments in .cpp file. *
-*****************************************************************************/
+/******************************************************************
+* > class Plane                                                   *
+* The representation of a plane in 3D space.                      *
+* The four parameters are scaled so that a,b,c is an unit vector. *
+* See the comments in .cpp file.                                  *
+******************************************************************/
 class Plane {
 	
 	protected:
@@ -26,11 +28,15 @@ class Plane {
 
 		static RandomDevice rndDev;
 
+		// methods
+		static Vector3d randomNormal(void);
+
 	public:
 
 		// construct
 		Plane(void): abc(1,0,0), d(0) {}
 		Plane(double a, double b, double c, double d);
+		Plane(const Vector3d abc, double d);
 
 		// const methods
 		pair<Vector3d, double> getParams(void) const { return {abc, d}; }
@@ -39,28 +45,28 @@ class Plane {
 
 		// other methods
 		virtual Plane& setPlane(const Vector3d& abc, double d);
-		virtual Plane& fromPointAndNorm(const Vector3d& point, const Vector3d& norm);
+		virtual Plane& setRandomPlane(double d1, double d2);
+		virtual Plane& fromPointAndNorm(const Vector3d& point,
+				const Vector3d& norm);
 
 		// operator
 		friend std::ostream& operator<<(std::ostream& out, const Plane& p);
-
-		// static
-		static Vector3d randomNormal(void);
 
 };
 
 
 /*************************************************************************
 * > class PlaneFunction                                                  *
-* Linear function R^2 -> R. The plane is used as representation of       *
+* Linear function R^2 -> R. The Plane is used as representation of       *
 * the linear function. x and y are the parameters, z is taken as result. *
-* NOTE: parameter c can't be 0.                                          *
+* NOTE: parameter c can't be 0..                                         *
+* See the comments in .cpp file.                                         *
 *************************************************************************/
 class PlaneFunction: public Plane {
 
 	public:
 
-		const double Z_EPS = 0.00001;
+		static const double Z_EPS;
 
 		// construct
 		PlaneFunction(void): Plane(0,0,1,0) {}
@@ -71,10 +77,17 @@ class PlaneFunction: public Plane {
 
 		// other methods
 		PlaneFunction& setPlane(const Vector3d& abc, double d) override;
+		PlaneFunction& setRandomPlane(double d1, double d2) override;
+		PlaneFunction& setRandomFunction(double x, double y,
+				double min, double max);
 		PlaneFunction& fromPointAndNorm(const Vector3d& point,
 				const Vector3d& norm) override;
 		
 		// operator
 		double operator()(double x, double y) const;
 		friend std::ostream& operator<<(std::ostream& out, const PlaneFunction& p);
+
+		// static
+		inline bool areFunctionParams(Vector3d p);
+
 };

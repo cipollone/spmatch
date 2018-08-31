@@ -25,6 +25,19 @@ Plane::Plane(double a, double b, double c, double d):
 }
 
 
+/**************************************************************************
+* > Plane()                                                               *
+* Constructs from the 4 parameters. Internally, the parameters are scaled *
+* so that a,b,c creates an unit vector.                                   *
+*                                                                         *
+* Args:                                                                   *
+*   abc (Vector3d): the first three parameters                            *
+*   d (double): the fourth parameter                                      *
+**************************************************************************/
+Plane::Plane(const Vector3d abc, double d):
+		Plane(abc(0), abc(1), abc(2), d) {}
+
+
 /*******************************************************************
 * > setPlane()                                                     *
 * Set the current plane with the given parameters. Parameters will *
@@ -41,6 +54,33 @@ Plane& Plane::setPlane(const Vector3d& abc, double d) {
 	double len = abc.norm();
 	this->abc = abc/len;
 	this->d = d/len;
+
+	return *this;
+}
+
+
+/*************************************************************************
+* > setRandomPlane()                                                     *
+* Sets the current plane as random in a range with uniform distribution. *
+* The range is the position of the plane with respect to the origin      *
+* (distance with sign).                                                  *
+*                                                                        *
+* Args:                                                                  *
+*   double (d1): minimum distance (with sign)                            *
+*   double (d2): maximum distance (with sign)                            *
+*                                                                        *
+* Returns:                                                               *
+*   (Plane&): reference to this                                          *
+*************************************************************************/
+Plane& Plane::setRandomPlane(double d1, double d2) {
+
+	// Normal
+	abc = randomNormal();
+
+	// When the normal is an unit vector,
+	// d is just the distance of the origin (with sign)
+	std::uniform_real_distribution<double> uniform(d1, d2);
+	d = uniform(rndDev.rndDev);
 
 	return *this;
 }
@@ -126,6 +166,9 @@ Vector3d Plane::randomNormal(void) {
 
 // > class PlaneFunction
 
+const double PlaneFunction::Z_EPS = 0.0001;
+
+
 /***************************************************************************
 * > PlaneFunction()                                                        *
 * Constructs a linear function in two arguments with the given parameters. *
@@ -165,10 +208,76 @@ Vector3d PlaneFunction::getFunParams() const {
 PlaneFunction& PlaneFunction::setPlane(const Vector3d& abc, double d) {
 
 	Plane::setPlane(abc, d);
-	if (abc(2) < Z_EPS) {
-		throw std::runtime_error("Plane coefficient for z close to 0: " +
+	if (!areFunctionParams(abc)) {
+		throw std::runtime_error("Plane coefficient for z < Z_EPS (in norm): " +
 				std::to_string(abc(2)));
 	}
+
+	return *this;
+}
+
+
+/****************************************************************************
+* > setRandomPlane()                                                        *
+* Sets the current function as random in a range with uniform distribution. *
+* The range is the position of the plane with respect to the origin         *
+* (distance with sign).                                                     *
+*                                                                           *
+* Args:                                                                     *
+*   double (d1): minimum distance (with sign)                               *
+*   double (d2): maximum distance (with sign)                               *
+*                                                                           *
+* Returns:                                                                  *
+*   (Plane&): reference to this                                             *
+****************************************************************************/
+PlaneFunction& PlaneFunction::setRandomPlane(double d1, double d2) {
+
+	// Normal
+	do {
+		abc = randomNormal();
+	} while (!areFunctionParams(abc));
+
+	// When the normal is an unit vector,
+	// d is just the distance of the origin (with sign)
+	std::uniform_real_distribution<double> uniform(d1, d2);
+	d = uniform(rndDev.rndDev);
+
+	return *this;
+}
+
+
+/****************************************************************************
+* > setRandomFunction()                                                     *
+* Sets the current function to be random in a range with uniform            *
+* distribution.  The range is the set of allowed values at the given point. *
+*                                                                           *
+* Args:                                                                     *
+*   double (x): point x coord                                               *
+*   double (y): point y coord                                               *
+*   double (min): min output value at (x,y)                                 *
+*   double (max): max output value at (x,y)                                 *
+*                                                                           *
+* Returns:                                                                  *
+*   (PlaneFunction&): reference to this                                     *
+****************************************************************************/
+PlaneFunction& PlaneFunction::setRandomFunction(double x, double y,
+		double min, double max) {
+	
+	// Sampling in the point--normal representation
+	
+	// point
+	std::uniform_real_distribution<double> uniform(min, max);
+	double zValue = uniform(rndDev.rndDev);
+
+	// normal
+	// Generate a non-vertical plane
+	//	NOTE: assuming Z_EPS is small (Z_EPS >= 1 cause an infinite loop)
+	Vector3d n;
+	do {
+		n = randomNormal();
+	} while (!areFunctionParams(n));
+
+	fromPointAndNorm({x,y,zValue},n);
 
 	return *this;
 }
@@ -190,8 +299,8 @@ PlaneFunction& PlaneFunction::fromPointAndNorm(const Vector3d& point,
 		const Vector3d& norm) {
 
 	Plane::fromPointAndNorm(point, norm);
-	if (abc(2) < Z_EPS) {
-		throw std::runtime_error("Plane coefficient for z close to 0: " +
+	if (!areFunctionParams(abc)) {
+		throw std::runtime_error("Plane coefficient for z < Z_EPS (in norm): " +
 				std::to_string(abc(2)));
 	}
 
@@ -223,4 +332,14 @@ double PlaneFunction::operator()(double x, double y) const {
 // print
 std::ostream& operator<<(std::ostream& out, const PlaneFunction& p) {
 	return out << "{ " << p.getFunParams().transpose() << " }";
+}
+
+
+/*******************************************************
+* > areFunctionParams()                                *
+* Returns:                                             *
+*   (bool): true if p is a valid normal for a function *
+*******************************************************/
+inline bool PlaneFunction::areFunctionParams(Vector3d p) {
+	return std::abs(p(2)) > Z_EPS;
 }
