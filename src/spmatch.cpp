@@ -14,11 +14,13 @@
 #include <fstream>
 #include <boost/program_options.hpp>
 
-#include "image.hpp"
+#include "debug.hpp"
 
 
 namespace optionsLib = boost::program_options;
 using std::string;
+using std::cout;
+using std::endl;
 
 
 /**************************************************************************
@@ -34,6 +36,7 @@ using std::string;
 void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
 		const string& disparityPath) {
 
+	/*
 	// Read the two stereo images
 	StereoImagePair stereo(leftImgPath, rightImgPath);
 
@@ -41,16 +44,22 @@ void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
 	Image disparity = stereo.computeDisparity();
 	
 	// Write the result
-	// TODO
+	// todo
 	
-	// TODO: remove this
+	// todo: remove this
 	disparity.display("Disparity");
+	*/
 
 }
 
 
 // main
 int main(int argc, char *argv[]) {
+
+#ifdef DEBUGGING
+	debug();
+	return 0;
+#endif // DEBUGGING
 
 	// parsing the command line
 	optionsLib::options_description optDescription("SPMatch. "
@@ -108,4 +117,3 @@ int main(int argc, char *argv[]) {
 
 	return 1;
 }
-

@@ -4,7 +4,13 @@
 #include <string>
 #include <iostream>
 #include <memory>
-#include <CImg.h>
+
+#include "geometry.hpp"
+#include "utils.hpp"
+
+#include <CImg.h>         // NOTE: including this before geometry.hpp
+                          // (therefore Eigen) results in a compilation error
+													// because of X11.h
 
 using std::string;
 using namespace cimg_library;
@@ -16,7 +22,7 @@ using namespace cimg_library;
 ************************************/
 class Image {
 
-	private:
+	protected:
 
 		string imgPath;
 
@@ -47,14 +53,13 @@ class StereoImage: public Image {
 
 	private:
 
-		// TODO: a grid of planes
-
-
+		Grid<PlaneFunction> pixelPlanes;
+		// TODO: methods for gridofplanes?
 
 	public:
 
 		// constr
-		StereoImage(const string& imgPath): Image(imgPath) {}
+		StereoImage(const string& imgPath);			// copy implicitly deleted
 
 };
 

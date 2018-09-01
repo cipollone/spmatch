@@ -12,9 +12,10 @@ Image::Image(const string& imgPath):
 		imgPath(imgPath), img(imgPath.c_str()),
 		width(img.width()), height(img.height()), channels(img.spectrum()) {
 	
-	if (channels != 1 || channels != 3 || channels != 4) {
+	if (channels != 3) {
 		throw std::runtime_error(
-				"Wrong image format. Grayscale, RGB, RGBA supported");
+				"Wrong image format: " + std::to_string(channels) +
+				" channels; only RGB supported");
 	}
 }
 
@@ -40,6 +41,21 @@ std::ostream& operator<<(std::ostream& out, const Image& img) {
 		"," << img.height << "," << img.channels << ")";
 }
 
+
+// > class StereoImage
+/*************************************************************************
+* > StereoImage()                                                        *
+* Constructor. Initialize an image for stereo matching.  Loads the image *
+* and initialize the array of support windows for each pixel.            *
+*                                                                        *
+* Args:                                                                  *
+*   imgPath (string): the path of the image to load.                     *
+*************************************************************************/
+StereoImage::StereoImage(const string& imgPath):
+		Image(imgPath),
+		pixelPlanes(img.width(), img.height(),
+			Grid<PlaneFunction>::Order::WIDTH_HEIGHT) {}
+		// TODO: width, height order
 
 
 // > class StereoImagePair
