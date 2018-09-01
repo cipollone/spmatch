@@ -28,19 +28,25 @@ class Image {
 
 		CImg<double> img;            // NOTE: using double type for pixels
 
-		int width;
-		int height;
-		int channels;
+		size_t width;
+		size_t height;
+		size_t channels;
 
 	public:
 
 		// constr
-		Image(const string& imgPath);
-		Image(const Image&) = delete;     // no copies
+		explicit Image(const string& imgPath);
+		explicit Image(size_t width, size_t height, size_t channels);
+		explicit Image(const Image&) = default;
 		Image(Image&&) = default;         // move: allows to return images
 
-		// functions
-		void display(string windowName="");
+		// const methods
+		void display(string windowName="") const;
+		void write(void) { img.save(imgPath.c_str()); }
+		Image toGrayscale(void) const;
+
+		// methods
+		void setPath(const string& path) { imgPath = path; }
 
 		// operators
 		Image& operator=(const Image&) = delete;
@@ -54,7 +60,7 @@ class StereoImage: public Image {
 	private:
 
 		Grid<PlaneFunction> pixelPlanes;
-		// TODO: methods for gridofplanes?
+		// TODO: methods for grid?
 
 	public:
 
@@ -83,11 +89,11 @@ class StereoImagePair {
 				leftImg(leftImgPath), rightImg(rightImgPath) {}
 
 		
-		// functions
+		// methods
 		void displayBoth(void);
 		Image computeDisparity(void);
 
-		// ops
+		// operators
 		friend std::ostream& operator<<(std::ostream& o, const StereoImagePair& p);
 
 };

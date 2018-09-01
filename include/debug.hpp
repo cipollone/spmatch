@@ -14,19 +14,14 @@ using std::endl;
 void debug(void) {
 
 	// Just testing here
-	
-	// Testing the correct initialization of order
-	Grid<PlaneFunction> grid1(3, 2, Grid<PlaneFunction>::Order::ROWS_COLS);
-	Grid<PlaneFunction> grid2(3, 2, Grid<PlaneFunction>::Order::WIDTH_HEIGHT);
 
-	grid1(2,0) = {3,3,2};
-	grid2(2,0) = {3,3,2};
-	
-	cout << grid1 << endl;
-	cout << endl;
-	cout << grid2 << endl;
+	// Testing to grayscale
+	Image img("../tests/cones/im2.png");
+	Image grayImg = img.toGrayscale();
 
-	cout << grid1(4) << endl;
-	cout << grid1(4) << endl;
+	img.display();
+	grayImg.display();
 
+	grayImg.setPath("../grayscale_test.png");
+	grayImg.write();
 }
