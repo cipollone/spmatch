@@ -10,7 +10,7 @@ pages 14.1-14.11. BMVA Press, September 2011.
 
 ## Dependencies:
 * libboost
-* CImg
+* cimg-dev
 * imagemagic
 * libeigen3
 

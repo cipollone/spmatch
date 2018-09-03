@@ -2,8 +2,6 @@
 #pragma once
 
 #include <string>
-#include <iostream>
-#include <memory>
 
 #include "geometry.hpp"
 #include "utils.hpp"
@@ -42,7 +40,7 @@ class Image {
 
 		// const methods
 		void display(string windowName="") const;
-		void write(void) { img.save(imgPath.c_str()); }
+		void write(void) const { img.save(imgPath.c_str()); }
 		Image toGrayscale(void) const;
 
 		// methods
@@ -50,50 +48,8 @@ class Image {
 
 		// operators
 		Image& operator=(const Image&) = delete;
+		double operator()(size_t w, size_t h, size_t c) const { return img(w,h,0,c); }
+		double operator()(size_t w, size_t h) const { return img(w,h); }
 		friend std::ostream& operator<<(std::ostream& o, const Image& i);
-
-};
-
-
-class StereoImage: public Image {
-
-	private:
-
-		Grid<PlaneFunction> pixelPlanes;
-		// TODO: methods for grid?
-
-	public:
-
-		// constr
-		StereoImage(const string& imgPath);			// copy implicitly deleted
-
-};
-
-
-/***************************************
-* > class StereoImagePair              *
-* Represents a couple of StereoImages. *
-* See .cpp file                        *
-***************************************/
-class StereoImagePair {
-	
-	private:
-
-		StereoImage leftImg;
-		StereoImage rightImg;
-
-	public:
-
-		// constr
-		StereoImagePair(const string& leftImgPath, const string& rightImgPath):
-				leftImg(leftImgPath), rightImg(rightImgPath) {}
-
-		
-		// methods
-		void displayBoth(void);
-		Image computeDisparity(void);
-
-		// operators
-		friend std::ostream& operator<<(std::ostream& o, const StereoImagePair& p);
 
 };
