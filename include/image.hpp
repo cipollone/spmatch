@@ -14,10 +14,12 @@ using std::string;
 using namespace cimg_library;
 
 
-/************************************
-* > class Image                     *
-* A wrapper class for the CImg type *
-************************************/
+/********************************************************
+* > class Image                                         *
+* A wrapper class for the CImg type.                    *
+* Pixels are stored as double in [0, 255] in RGB space. *
+* See the comments in .cpp file.                        *
+********************************************************/
 class Image {
 
 	protected:
@@ -39,6 +41,8 @@ class Image {
 		Image(Image&&) = default;         // move: allows to return images
 
 		// const methods
+		double at(double w, double h, size_t c) const;
+		const CImg<double> getCImg(void) const { return img; }
 		void display(string windowName="") const;
 		void write(void) const { img.save(imgPath.c_str()); }
 		Image toGrayscale(void) const;

@@ -39,6 +39,47 @@ Image::Image(size_t width, size_t height, size_t channels):
 }
 
 
+/**************************************************************************
+* > at()                                                                  *
+* Returns the intensity of the c channel. The result is obtained with     *
+* bilinear interpolation in the x,y directions. NOTE: bounds are checked. *
+* For fast, discrete lookup, use the () operator.                         *
+**************************************************************************/
+double Image::at(double w, double h, size_t c) const {
+
+	// checks
+	if (c >= channels) {
+		throw std::logic_error("Wrong channel, " + std::to_string(c) +
+				" of [0, " + std::to_string(channels-1) + "]");
+	}
+	if (w >= width || h >= height || w < 0 || h < 0) {
+		throw std::logic_error("Wrong coorinate, (" + std::to_string(w) +
+				", " + std::to_string(h) + ") of (0, 0) -- (" +
+				std::to_string(width-1) + ", " + std::to_string(height-1) + ")");
+	}
+
+	// Get extremes
+	size_t wLow = std::floor(w);
+	size_t hLow = std::floor(h);
+	size_t wHigh = std::ceil(w);
+	size_t hHigh = std::ceil(h);
+	double x = w - wLow;
+	double y = h - hLow;
+
+	double z00 = img(wLow, hLow, c);
+	double z01 = img(wLow, hHigh, c);
+	double z10 = img(wHigh, hLow, c);
+	double z11 = img(wHigh, hHigh, c);
+
+	// linear
+	double z = z00 * (1 - x) * (1 - y) + 
+			z10 * x * (1 - y) + 
+			z01 * (1 - x) * y + 
+			z11 * x * y;
+	return z;
+}
+
+
 /*************************************************
 * > display()                                    *
 * Show the image in a new window                 *

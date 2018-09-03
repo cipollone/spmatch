@@ -19,18 +19,30 @@ namespace Params {
 * > class StereoImage                                                *
 * An image and its additional informations used for stereo matching. *
 * The methods implements parts of the PatchMatch Stereo algorithm.   *
+* Some methods requires this image to be bound to another one.       *
+* See the comments in .cpp file                                      *
 *********************************************************************/
 class StereoImage: public Image {
 
 	private:
 
+		CImg<double> imgGradient;
 		Grid<PlaneFunction> pixelPlanes;
+
+		StereoImage* other = nullptr;
 
 	public:
 
 		// constr
 		StereoImage(const string& imgPath);			// copy implicitly deleted
 
+		// const methods
+		double getDisparityAt(size_t w, size_t h) const;
+		void displayGradient(void) const;
+
+		// methods
+		void bind(StereoImage* o);
+		void unbind(void);
 };
 
 

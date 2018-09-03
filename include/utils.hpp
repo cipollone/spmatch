@@ -55,7 +55,7 @@ class Grid {
 		const T& get(size_t i1, size_t i2) const;
 
 		// operators
-		T& operator()(size_t r, size_t c);
+		T& operator()(size_t i1, size_t i2);
 		T& operator()(size_t i) { return data[i]; }
 		template<typename S>
 		friend std::ostream& operator<<(std::ostream& o, const Grid<S>& g);
