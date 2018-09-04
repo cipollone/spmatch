@@ -13,20 +13,25 @@
 * Args:                                                 *
 *   imgPath (string): the path of the image to load.    *
 ********************************************************/
-StereoImage::StereoImage(const string& imgPath):
+StereoImage::StereoImage(const string& imgPath, Side side):
 		Image(imgPath),
 		pixelPlanes(width, height,
-			Grid<PlaneFunction>::Order::WIDTH_HEIGHT) {
+			Grid<PlaneFunction>::Order::WIDTH_HEIGHT),
+		side(side) {
 
 	// convert to grayscale and store the x gradient
 	Image grayscale = toGrayscale();
-	imgGradient = grayscale.getCImg().get_gradient("x", 2)(0);
+	gradients = grayscale.getCImg().get_gradient("xy", 2);
 			// NOTE: ^ this is a copy
+	if (Params::NORMALIZE_GRADIENTS) {
+		gradients(0).normalize(0,255);
+		gradients(1).normalize(0,255);
+	}
 }
 
 
 /**************************************************************************
-* > getDisparityAt()                                                      *
+* > disparityAt()                                                         *
 * Returns the dispariry value at pixel (w,h), as the z-value of the plane *
 * at (w,h). NOTE: the plane must be computed, first.                      *
 * NOTE: bounds are not checked.                                           *
@@ -37,20 +42,82 @@ StereoImage::StereoImage(const string& imgPath):
 * Returns:                                                                *
 *   (double): disparity in the continuous domain                          *
 **************************************************************************/
-double StereoImage::getDisparityAt(size_t w, size_t h) const {
+double StereoImage::disparityAt(size_t w, size_t h) const {
 
 	const PlaneFunction& p = pixelPlanes.get(w, h);
 	return p(w,h);
 }
 
 
-/*********************************************************
-* > displayGradient()                                    *
-* Visualizes the gradient image (renormalized in 0-255). *
-*********************************************************/
-void StereoImage::displayGradient(void) const {
-	auto visualGradient = imgGradient.get_normalize(0,255);
-	visualGradient.display(("Gradient img of " + imgPath).c_str());
+/**************************************************************
+* > displayGradient()                                         *
+* Visualizes the x,y gradient images (renormalized in 0-255). *
+**************************************************************/
+void StereoImage::displayGradients(void) const {
+	auto gradientX = gradients(0).get_normalize(0,255);
+	auto gradientY = gradients(1).get_normalize(0,255);
+	gradientX.display(("Gradient X of " + imgPath).c_str());
+	gradientY.display(("Gradient Y of " + imgPath).c_str());
+}
+
+
+/***************************************************************************
+* > pixelDissimilarity()                                                   *
+* Computes the disparity function ro(p,q) for p = (w, h) in the current    *
+* view (image), and q as the corresponding pixel in the other view.        *
+* q has coordinates: (w + disparity(p), h).                                *
+* See the reference paper, PatchMatch Stereo, for the function definition. *
+* NOTE: requires a bound instance and an RGB image. No bounds check        *
+*                                                                          *
+* Args:                                                                    *
+*   w (size_t), h (size_t): coordinates of the pixel in this image         *
+*   disparity (PlaneFunction): the disparity function                      *
+*                                                                          *
+* Returns:                                                                 *
+*   (double): the disparity measure                                        *
+***************************************************************************/
+double StereoImage::pixelDissimilarity(size_t w, size_t h,
+		const PlaneFunction& disparity) const {
+	
+	if (other == nullptr) {
+		throw std::logic_error("Instance not bound");
+	}
+
+	// Coordinates of the other pixel
+	double d = disparity(w, h);
+	int sign;
+	switch (side) {
+		case LEFT: sign = -1; break;
+		case RIGHT: sign = +1; break;
+	}
+	double qW = w + sign * d;
+	double qH = h;
+
+	// This pixel colour and gradient
+	double pR = img(w,h,0,0);
+	double pG = img(w,h,0,1);
+	double pB = img(w,h,0,2);
+	double pGrX = gradients(0)(w,h,0,0);
+	double pGrY = gradients(1)(w,h,0,0);
+
+	// The other pixel colour and gradient
+	double qR = other->at(qW,qH,0);
+	double qG = other->at(qW,qH,1);
+	double qB = other->at(qW,qH,2);
+	double qGrX = other->gradients(0)(qW,qH,0,0);
+	double qGrY = other->gradients(1)(qW,qH,0,0);
+
+	// Function
+	double gradientDist = std::abs(pGrX - qGrX) +
+			std::abs(pGrY - qGrY);  // NOTE: L1
+	double colourDist = std::abs(pR - qR) +
+			std::abs(pG - qG) +
+			std::abs(pB - qB);      // NOTE: L1
+
+	double res = (1 - Params::ALFA) * std::min(colourDist, Params::TAU_COL) +
+			Params::ALFA * std::min(gradientDist, Params::TAU_GRAD);
+	
+	return res;
 }
 
 
