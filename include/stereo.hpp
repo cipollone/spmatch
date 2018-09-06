@@ -17,14 +17,21 @@
 * RGB and gradients.                                                      *
 **************************************************************************/
 namespace Params {
+
+	// Def
+	enum class OutOfBounds { REPEAT_PIXEL, BLACK_PIXEL, ZERO_COST, ERROR };
 	
+	// Math constants
 	const double ALFA = 0.6;
 	const double TAU_COL = 50;
 	const double TAU_GRAD = 30;
 
+	// Flags
 	const bool NORMALIZE_GRADIENTS = true; // With this false, TAU_GRAD must
 	                                       //   also change
-}
+	const OutOfBounds OUT_OF_BOUNDS = OutOfBounds::ERROR;
+
+} // TODO: let to change these parameters from main()
 
 
 /**************************************************************************
@@ -35,7 +42,7 @@ namespace Params {
 * The member pixelPlanes is the linear disparity function for each pixel. *
 * See the comments in .cpp file                                           *
 **************************************************************************/
-class StereoImage: public Image {
+class StereoImage {
 
 	public:
 
@@ -43,23 +50,31 @@ class StereoImage: public Image {
 
 	private:
 
-		CImgList<double> gradients;
+		Image image;
+
+		size_t width;
+		size_t height;
+
 		Grid<PlaneFunction> pixelPlanes;
+		Image gradientX;
+		Image gradientY;
 
-		StereoImage* other = nullptr;
 		Side side;
-
+		StereoImage* other = nullptr;
+	
 	public:
 
 		// constr
-		StereoImage(const string& imgPath, Side side);	// copy implicitly deleted
+		StereoImage(const string& imgPath, Side side);
+		explicit StereoImage(const StereoImage&) = default;
+		StereoImage(StereoImage&&) = default;
 
 		// const methods
 		double disparityAt(size_t w, size_t h) const;
 		void displayGradients(void) const;
-		void writeGradients(void) const;
 		double pixelDissimilarity(size_t w, size_t h,
 				const PlaneFunction& disparity) const;
+		double adaptiveWeight(size_t pW, size_t pH, size_t qW, size_t qH); // TODO
 
 		// methods
 		void bind(StereoImage* o);
@@ -89,10 +104,6 @@ class StereoImagePair {
 		{}
 		
 		// methods
-		void displayBoth(void);
 		Image computeDisparity(void);
-
-		// operators
-		friend std::ostream& operator<<(std::ostream& o, const StereoImagePair& p);
 
 };

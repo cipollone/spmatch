@@ -39,6 +39,65 @@ Image::Image(size_t width, size_t height, size_t channels):
 }
 
 
+/*******************************************************
+* > Image()                                            *
+* Constructs a new image with the given size.          *
+*                                                      *
+* Args:                                                *
+*   width (size_t), height (size_t), channels (size_t) *
+*   val (double): initial value of each pixel          *
+*******************************************************/
+Image::Image(size_t width, size_t height, size_t channels, double val):
+		imgPath("new_img.png"), img(width, height, 1, channels, val),
+		width(width), height(height), channels(channels) {
+
+	if (channels != 1 && channels != 3) {
+		throw std::logic_error(
+				"Wrong image format: " + std::to_string(channels) +
+				" channels; only RGB and Grayscale supported");
+	}
+}
+
+
+/********************************************************************
+* > Image()                                                         *
+* Constructs a new image moving the CImg into the current instance. *
+*                                                                   *
+* Args:                                                             *
+*   im (CImg<double>&&): image to be moved                          *
+********************************************************************/
+Image::Image(CImg<double>&& im):
+		imgPath("new_img.png"),
+		width(im.width()),
+		height(im.height()),
+		channels(im.spectrum()) {
+	im.move_to(img);
+}
+
+
+/***************************************************************************
+* > size()                                                                 *
+* Args:                                                                    *
+*   dim (unsigned): dimension number. { 0: width, 1: height, 2: channels } *
+*                                                                          *
+* Returns:                                                                 *
+*   (size_t): lenght of dimension 'dim'                                    *
+***************************************************************************/
+size_t Image::size(unsigned dim) const {
+	switch (dim) {
+		case 0:
+			return width;
+		case 1:
+			return height;
+		case 2:
+			return channels;
+		default:
+			throw std::logic_error(std::to_string(dim) +
+					" is not a dimension {0,1,2}");
+	}
+}
+
+
 /**************************************************************************
 * > at()                                                                  *
 * Returns the intensity of the c channel. The result is obtained with     *
@@ -127,6 +186,28 @@ Image Image::toGrayscale(void) const {
 	}
 
 	return grayscale;
+}
+
+
+/***************************************************************
+* > operator=                                                  *
+* Assingn a CImg to the current instance with a move operation *
+*                                                              *
+* Args:                                                        *
+*   im (CImg<double>&&): image to be moved                     *
+*                                                              *
+* Returns:                                                     *
+*   (Image&): reference to this                                *
+***************************************************************/
+Image& Image::operator=(CImg<double>&& im) {
+
+	imgPath = "new_img.png";
+	width = im.width();
+	height = im.height();
+	channels = im.spectrum();
+	im.move_to(img);
+
+	return *this;
 }
 
 

@@ -14,19 +14,26 @@
 *   imgPath (string): the path of the image to load.    *
 ********************************************************/
 StereoImage::StereoImage(const string& imgPath, Side side):
-		Image(imgPath),
-		pixelPlanes(width, height,
-			Grid<PlaneFunction>::Order::WIDTH_HEIGHT),
+		image(imgPath),
+		width(image.size(0)),
+		height(image.size(1)),
+		pixelPlanes(width, height, Grid<PlaneFunction>::Order::WIDTH_HEIGHT),
+		gradientX(0,0,1),
+		gradientY(0,0,1),
 		side(side) {
 
-	// convert to grayscale and store the x gradient
-	Image grayscale = toGrayscale();
-	gradients = grayscale.getCImg().get_gradient("xy", 2);
-			// NOTE: ^ this is a copy
+	// convert to grayscale and store the gradients
+	Image grayscale = image.toGrayscale();
+	CImgList<double> gradients;
+	grayscale.getCImg().get_gradient("xy", 2).move_to(gradients);
+
 	if (Params::NORMALIZE_GRADIENTS) {
 		gradients(0).normalize(0,255);
 		gradients(1).normalize(0,255);
 	}
+
+	gradientX = std::move(gradients(0));
+	gradientY = std::move(gradients(1));
 }
 
 
@@ -54,10 +61,8 @@ double StereoImage::disparityAt(size_t w, size_t h) const {
 * Visualizes the x,y gradient images (renormalized in 0-255). *
 **************************************************************/
 void StereoImage::displayGradients(void) const {
-	auto gradientX = gradients(0).get_normalize(0,255);
-	auto gradientY = gradients(1).get_normalize(0,255);
-	gradientX.display(("Gradient X of " + imgPath).c_str());
-	gradientY.display(("Gradient Y of " + imgPath).c_str());
+	gradientX.display("Gradient X");
+	gradientY.display("Gradient Y");
 }
 
 
@@ -67,7 +72,10 @@ void StereoImage::displayGradients(void) const {
 * view (image), and q as the corresponding pixel in the other view.        *
 * q has coordinates: (w + disparity(p), h).                                *
 * See the reference paper, PatchMatch Stereo, for the function definition. *
-* NOTE: requires a bound instance and an RGB image. No bounds check        *
+* NOTE: requires a bound instance and an RGB image.                        *
+* NOTE: the result for out-of-bounds coordinates is specified by           *
+* Params::OUT_OF_BOUNDS.                                                   *
+* NOTE: pay attention at implicit conversions int -> size_t.               *
 *                                                                          *
 * Args:                                                                    *
 *   w (size_t), h (size_t): coordinates of the pixel in this image         *
@@ -79,8 +87,13 @@ void StereoImage::displayGradients(void) const {
 double StereoImage::pixelDissimilarity(size_t w, size_t h,
 		const PlaneFunction& disparity) const {
 	
+	// checks
 	if (other == nullptr) {
 		throw std::logic_error("Instance not bound");
+	}
+	if (w >= width || h >= height) {
+		throw std::runtime_error("Out of bounds (" + std::to_string(w) +
+				", " + std::to_string(h) + ")");
 	}
 
 	// Coordinates of the other pixel
@@ -93,19 +106,44 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 	double qW = w + sign * d;
 	double qH = h;
 
-	// This pixel colour and gradient
-	double pR = img(w,h,0,0);
-	double pG = img(w,h,0,1);
-	double pB = img(w,h,0,2);
-	double pGrX = gradients(0)(w,h,0,0);
-	double pGrY = gradients(1)(w,h,0,0);
+	// Colour and gradient of this pixel
+	double pR = image(w,h,0);
+	double pG = image(w,h,1);
+	double pB = image(w,h,2);
+	double pGrX = gradientX(w,h);
+	double pGrY = gradientY(w,h);
 
-	// The other pixel colour and gradient
-	double qR = other->at(qW,qH,0);
-	double qG = other->at(qW,qH,1);
-	double qB = other->at(qW,qH,2);
-	double qGrX = other->gradients(0)(qW,qH,0,0);
-	double qGrY = other->gradients(1)(qW,qH,0,0);
+	// Is (qW, qH) out of the image?
+	bool qIsOut = false;
+	if (qW < 0 || qW >= other->width) {
+		qIsOut = true;
+
+		switch (Params::OUT_OF_BOUNDS) {
+			case Params::OutOfBounds::ZERO_COST:
+				return 0;
+			case Params::OutOfBounds::ERROR:
+				throw std::logic_error("The pixel (" + std::to_string(w) + ", " +
+						std::to_string(h) + ") in the other view is out of bounds");
+			case Params::OutOfBounds::REPEAT_PIXEL:
+				qIsOut = false;		// false means solved; no 'break;' here
+			case Params::OutOfBounds::BLACK_PIXEL:
+				if (qW < 0) { qW = 0; }
+				else if (qW >= other->width) { qW = other->width-1; }
+		}
+	}
+
+	// Colour and gradient of the other pixel
+	double qR = other->image.at(qW,qH,0);
+	double qG = other->image.at(qW,qH,1);
+	double qB = other->image.at(qW,qH,2);
+	double qGrX = other->gradientX.at(qW,qH,0);
+	double qGrY = other->gradientY.at(qW,qH,0);
+
+	// Is (qW, qH) out of the image?
+	if (qIsOut && Params::OUT_OF_BOUNDS == Params::OutOfBounds::BLACK_PIXEL) {
+		qR = 0; qG = 0; qB = 0;
+		qGrX = 0; qGrY = 0;
+	}
 
 	// Function
 	double gradientDist = std::abs(pGrX - qGrX) +
@@ -164,16 +202,6 @@ void StereoImage::unbind(void) {
 
 // > class StereoImagePair
 
-/**********************************
-* > displayBoth()                 *
-* Show both images in two windows *
-**********************************/
-void StereoImagePair::displayBoth(void) {
-	leftImg.display("Left image");
-	rightImg.display("Right image");
-}
-
-
 /********************************************************************
 * > computeDisparity()                                              *
 * Computes the disparity map of the two images using the PatchMatch *
@@ -187,9 +215,3 @@ Image StereoImagePair::computeDisparity(void) {
 	return Image("../tests/cones/all.png");
 }
 
-
-// print
-std::ostream& operator<<(std::ostream& out, const StereoImagePair& pair) {
-	return out << "StereoImagePair:\n  " << pair.leftImg << "\n  " <<
-		pair.rightImg << std::endl;
-}

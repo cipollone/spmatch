@@ -9,10 +9,12 @@ and Emanuele Trucco, Proceedings of the British Machine Vision Conference,
 pages 14.1-14.11. BMVA Press, September 2011.
 
 ## Dependencies:
-* libboost
-* cimg-dev
-* imagemagic
-* libeigen3
+* libboost (1.62)
+* cimg-dev (1.7.9)
+* imagemagick (8:6.9.7)
+* libeigen3-dev (3.3.2)
+The verion numbers are the ones that have been used. Any future version with
+the same API is fine.
 
 ## Usage:
 Run:

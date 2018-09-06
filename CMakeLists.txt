@@ -13,9 +13,9 @@ set(CMAKE_CXX_STANDARD 11) # cxx version
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # commands for vim youcompleteme
 
 if(RELEASE)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 else(RELEASE)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O0 -g")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -O0 -g")
 endif(RELEASE)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread") # Linux specific
