@@ -159,6 +159,106 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 }
 
 
+/***************************************************************************
+* > adaptiveWeight()                                                       *
+* Computes the weight function w(p1,p2). See equation (4) in the reference *
+* paper, PatchMatch Stereo. It returns a weight (0,1] that is higer for    *
+* pixels with similar colour. An idea called adaptive support weight       *
+* function. The two pixels are from this image.                            *
+*                                                                          *
+* Args:                                                                    *
+*   w1 (size_t): width coordinate of the first point.                      *
+*   h1 (size_t): height coordinate of the first point.                     *
+*   w2 (size_t): width coordinate of the second point.                     *
+*   h2 (size_t): height coordinate of the second point.                    *
+*                                                                          *
+* Returns:                                                                 *
+*   (double): the weight in (0,1]                                          *
+***************************************************************************/
+double StereoImage::adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2)
+		const {
+
+	// checks
+	if (w1 >= width || h1 >= height) {
+		throw std::runtime_error("Out of bounds (" + std::to_string(w1) +
+				", " + std::to_string(h1) + ")");
+	}
+	if (w2 >= width || h2 >= height) {
+		throw std::runtime_error("Out of bounds (" + std::to_string(w2) +
+				", " + std::to_string(h2) + ")");
+	}
+
+	// Colour of the first point
+	double p1R = image(w1,h1,0);
+	double p1G = image(w1,h1,1);
+	double p1B = image(w1,h1,2);
+
+	// Colour of the second point
+	double p2R = image(w2,h2,0);
+	double p2G = image(w2,h2,1);
+	double p2B = image(w2,h2,2);
+
+	double colourDist = std::abs(p1R - p2R) +
+			std::abs(p1G - p2G) +
+			std::abs(p1B - p2B);
+
+	return std::exp(-colourDist/Params::GAMMA);
+}
+
+
+/****************************************************************************
+* > pixelTotalCost()                                                        *
+* Computes the total matching cost for pixel (w,h). The total cost is the   *
+* sum of all matching costs for each pixel in a square window around (w,g). *
+* Each pixel in the window is matched againts a pixel in the other view,    *
+* according to the disparity function of (w,h).                             *
+* NOTE: Out of bounds pixels are ignored.                                   *
+*                                                                           *
+* Args:                                                                     *
+*   w (size_t): width coordinate of the pixel                               *
+*   h (size_t): height coordinate of the pixel                              *
+*                                                                           *
+* Returns:                                                                  *
+*   (double): window matching cost                                          *
+****************************************************************************/
+double StereoImage::pixelTotalCost(size_t w, size_t h) const {
+	
+	// checks
+	if (w >= width || h >= height) {
+		throw std::runtime_error("Out of bounds (" + std::to_string(w) +
+				", " + std::to_string(h) + ")");
+	}
+
+	// Setting the extremes of the window
+	unsigned halfSide = Params::WINDOW_SIZE / 2; // NOTE: assuming WINDOW_SIZE
+	                                             // is an odd number
+	size_t minW = (w > halfSide) ? (w - halfSide) : 0;
+	size_t maxW = (w + halfSide >= width) ? (width - 1) : (w + halfSide);
+	size_t minH = (h > halfSide) ? (h - halfSide) : 0;
+	size_t maxH = (h + halfSide >= height) ? (height - 1) : (h + halfSide);
+
+	// The disparity plane
+	const PlaneFunction& disparity = pixelPlanes.get(w, h);
+
+	// Scan each pixel in the window
+	double totalCost = 0;
+	for (size_t iW = minW; iW <= maxW; ++iW) {
+		for (size_t iH = minH; iH <= maxH; ++iH) {
+
+			// Accumulate the total with the current pixel
+			totalCost += adaptiveWeight(w, h, iW, iH) *
+					pixelDissimilarity(iW, iH, disparity);
+		}
+	}
+
+	// Normalizing the cost
+	int nPixels = static_cast<int>(maxW+1-minW) * static_cast<int>(maxH+1-minH);
+	double total = totalCost / nPixels;
+
+	return total;
+}
+
+
 /****************************************************************************
 * > bind()                                                                  *
 * Associate the current instance to the other one and vice-versa.           *

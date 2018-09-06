@@ -13,6 +13,8 @@
 *   const double ALFA = 0.9;                                              *
 *   const double TAU_COL = 10;                                            *
 *   const double TAU_GRAD = 2;                                            *
+*   const double GAMMA = 10;                                              *
+*   const unsigned int WINDOW_SIZE = 35;                                  *
 * However I can't use them, because I don't know the numeric range of the *
 * RGB and gradients.                                                      *
 **************************************************************************/
@@ -25,8 +27,10 @@ namespace Params {
 	const double ALFA = 0.6;
 	const double TAU_COL = 50;
 	const double TAU_GRAD = 30;
+	const double GAMMA = 15;
 
-	// Flags
+	// Other parameters
+	const unsigned WINDOW_SIZE = 35;       // Must be an odd number
 	const bool NORMALIZE_GRADIENTS = true; // With this false, TAU_GRAD must
 	                                       //   also change
 	const OutOfBounds OUT_OF_BOUNDS = OutOfBounds::ERROR;
@@ -74,7 +78,8 @@ class StereoImage {
 		void displayGradients(void) const;
 		double pixelDissimilarity(size_t w, size_t h,
 				const PlaneFunction& disparity) const;
-		double adaptiveWeight(size_t pW, size_t pH, size_t qW, size_t qH); // TODO
+		double adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2) const;
+		double pixelTotalCost(size_t w, size_t h) const;
 
 		// methods
 		void bind(StereoImage* o);
