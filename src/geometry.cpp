@@ -166,7 +166,7 @@ Vector3d Plane::randomNormal(void) {
 
 // > class PlaneFunction
 
-const double PlaneFunction::Z_EPS = 0.0001;
+const double PlaneFunction::Z_EPS = 0.01;
 
 
 /***************************************************************************

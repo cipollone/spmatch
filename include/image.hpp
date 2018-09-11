@@ -45,6 +45,8 @@ class Image {
 
 		// const methods
 		size_t size(unsigned dim) const;
+		double get(size_t w, size_t h, size_t c) const { return img(w,h,0,c); }
+		double get(size_t w, size_t h) const { return img(w,h); }
 		double at(double w, double h, size_t c) const;
 		const CImg<double>& getCImg(void) const { return img; }
 		void display(string windowName="") const;
@@ -57,8 +59,8 @@ class Image {
 		// operators
 		Image& operator=(const Image&) = delete;
 		Image& operator=(CImg<double>&&);
-		double operator()(size_t w, size_t h, size_t c) const { return img(w,h,0,c); }
-		double operator()(size_t w, size_t h) const { return img(w,h); }
+		double& operator()(size_t w, size_t h, size_t c) { return img(w,h,0,c); }
+		double& operator()(size_t w, size_t h) { return img(w,h); }
 		friend std::ostream& operator<<(std::ostream& o, const Image& i);
 
 };

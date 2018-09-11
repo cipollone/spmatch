@@ -15,11 +15,11 @@
 ********************************************************/
 StereoImage::StereoImage(const string& imgPath, Side side):
 		image(imgPath),
-		width(image.size(0)),
-		height(image.size(1)),
-		pixelPlanes(width, height, Grid<PlaneFunction>::Order::WIDTH_HEIGHT),
 		gradientX(0,0,1),
 		gradientY(0,0,1),
+		width(image.size(0)),
+		height(image.size(1)),
+		disparityPlanes(width, height, Grid<PlaneFunction>::Order::WIDTH_HEIGHT),
 		side(side) {
 
 	// convert to grayscale and store the gradients
@@ -51,13 +51,13 @@ StereoImage::StereoImage(const string& imgPath, Side side):
 **************************************************************************/
 double StereoImage::disparityAt(size_t w, size_t h) const {
 
-	const PlaneFunction& p = pixelPlanes.get(w, h);
+	const PlaneFunction& p = disparityPlanes.get(w, h);
 	return p(w,h);
 }
 
 
 /**************************************************************
-* > displayGradient()                                         *
+* > displayGradients()                                        *
 * Visualizes the x,y gradient images (renormalized in 0-255). *
 **************************************************************/
 void StereoImage::displayGradients(void) const {
@@ -107,11 +107,11 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 	double qH = h;
 
 	// Colour and gradient of this pixel
-	double pR = image(w,h,0);
-	double pG = image(w,h,1);
-	double pB = image(w,h,2);
-	double pGrX = gradientX(w,h);
-	double pGrY = gradientY(w,h);
+	double pR = image.get(w,h,0);
+	double pG = image.get(w,h,1);
+	double pB = image.get(w,h,2);
+	double pGrX = gradientX.get(w,h);
+	double pGrY = gradientY.get(w,h);
 
 	// Is (qW, qH) out of the image?
 	bool qIsOut = false;
@@ -122,8 +122,8 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 			case Params::OutOfBounds::ZERO_COST:
 				return 0;
 			case Params::OutOfBounds::ERROR:
-				throw std::logic_error("The pixel (" + std::to_string(w) + ", " +
-						std::to_string(h) + ") in the other view is out of bounds");
+				throw std::logic_error("The pixel (" + std::to_string(qW) + ", " +
+						std::to_string(qH) + ") in the other view is out of bounds");
 			case Params::OutOfBounds::REPEAT_PIXEL:
 				qIsOut = false;		// false means solved; no 'break;' here
 			case Params::OutOfBounds::BLACK_PIXEL:
@@ -189,14 +189,14 @@ double StereoImage::adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2)
 	}
 
 	// Colour of the first point
-	double p1R = image(w1,h1,0);
-	double p1G = image(w1,h1,1);
-	double p1B = image(w1,h1,2);
+	double p1R = image.get(w1,h1,0);
+	double p1G = image.get(w1,h1,1);
+	double p1B = image.get(w1,h1,2);
 
 	// Colour of the second point
-	double p2R = image(w2,h2,0);
-	double p2G = image(w2,h2,1);
-	double p2B = image(w2,h2,2);
+	double p2R = image.get(w2,h2,0);
+	double p2G = image.get(w2,h2,1);
+	double p2B = image.get(w2,h2,2);
 
 	double colourDist = std::abs(p1R - p2R) +
 			std::abs(p1G - p2G) +
@@ -238,7 +238,7 @@ double StereoImage::pixelTotalCost(size_t w, size_t h) const {
 	size_t maxH = (h + halfSide >= height) ? (height - 1) : (h + halfSide);
 
 	// The disparity plane
-	const PlaneFunction& disparity = pixelPlanes.get(w, h);
+	const PlaneFunction& disparity = disparityPlanes.get(w, h);
 
 	// Scan each pixel in the window
 	double totalCost = 0;
@@ -256,6 +256,26 @@ double StereoImage::pixelTotalCost(size_t w, size_t h) const {
 	double total = totalCost / nPixels;
 
 	return total;
+}
+
+
+/*********************************************************************
+* > getDisparityMap()                                                *
+* Produces an Image with the disparity map given by disparityPlanes. *
+*                                                                    *
+* Returns:                                                           *
+*   (Image): the disparity for each pixel, as a grayscale image      *
+*********************************************************************/
+Image StereoImage::getDisparityMap(void) const {
+
+	Image disp(width, height, 1);
+	for (size_t w = 0; w < width; ++w) {
+		for (size_t h = 0; h < height; ++h) {
+			disp(w, h) = disparityAt(w, h);
+		}
+	}
+
+	return disp;
 }
 
 
@@ -297,6 +317,23 @@ void StereoImage::unbind(void) {
 	// unbind
 	other->other = nullptr;
 	other = nullptr;
+}
+
+
+/**********************************************************************
+* > setRandomDisparities()                                            *
+* Set all 'disparityPlanes' to random linear functions. The range of  *
+* disparity values in the central pixel of each plane is given by the *
+* parameters [Params::MIN_D, Params::MAX_D]                           *
+**********************************************************************/
+void StereoImage::setRandomDisparities(void) {
+
+	for (size_t w = 0; w < width; ++w) {
+		for (size_t h = 0; h < height; ++h) {
+			disparityPlanes(w, h).setRandomFunction(w, h,
+					Params::MIN_D, Params::MAX_D);
+		}
+	}
 }
 
 
