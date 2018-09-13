@@ -21,7 +21,8 @@
 namespace Params {
 
 	// Def
-	enum class OutOfBounds { REPEAT_PIXEL, BLACK_PIXEL, ZERO_COST, ERROR };
+	enum class OutOfBounds { REPEAT_PIXEL, BLACK_PIXEL, ZERO_COST, ERROR,
+			NAN_COST };
 	
 	// Math constants
 	const double ALFA = 0.6;
@@ -33,7 +34,8 @@ namespace Params {
 	const unsigned WINDOW_SIZE = 35;       // Must be an odd number
 	const bool NORMALIZE_GRADIENTS = true; // With this false, TAU_GRAD must
 	                                       //   also change
-	const OutOfBounds OUT_OF_BOUNDS = OutOfBounds::ERROR;
+	const OutOfBounds OUT_OF_BOUNDS = OutOfBounds::NAN_COST;
+	const bool resizeWindowWithCosine = true;
 	const int MIN_D = 0;
 	const int MAX_D = 20;
 
@@ -54,7 +56,7 @@ class StereoImage {
 
 		enum Side { LEFT, RIGHT };
 
-	private:
+	public: // TODO
 
 		Image image;
 		Image gradientX;
@@ -67,13 +69,13 @@ class StereoImage {
 		Side side;
 		StereoImage* other = nullptr;	
 
-	private:
+	public: // TODO
 
 		// private const methods
 		double pixelDissimilarity(size_t w, size_t h,
 				const PlaneFunction& disparity) const;
 		double adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2) const;
-		double pixelTotalCost(size_t w, size_t h, const PlaneFunction& d) const;
+		double pixelWindowCost(size_t w, size_t h, const PlaneFunction& d) const;
 		double disparityAt(size_t w, size_t h) const;
 	
 	public:

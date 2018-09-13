@@ -97,7 +97,8 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 	}
 
 	// Coordinates of the other pixel
-	double d = disparity(w, h);
+	double d = disparity(w, h); // NOTE: this disparity can exceed the limits
+	                            //   We will just check out of bounds, for now
 	int sign;
 	switch (side) {
 		case LEFT: sign = -1; break;
@@ -105,13 +106,6 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 	}
 	double qW = w + sign * d;
 	double qH = h;
-
-	// Colour and gradient of this pixel
-	double pR = image.get(w,h,0);
-	double pG = image.get(w,h,1);
-	double pB = image.get(w,h,2);
-	double pGrX = gradientX.get(w,h);
-	double pGrY = gradientY.get(w,h);
 
 	// Is (qW, qH) out of the image?
 	bool qIsOut = false;
@@ -121,6 +115,8 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 		switch (Params::OUT_OF_BOUNDS) {
 			case Params::OutOfBounds::ZERO_COST:
 				return 0;
+			case Params::OutOfBounds::NAN_COST:
+				return std::numeric_limits<double>::quiet_NaN();
 			case Params::OutOfBounds::ERROR:
 				throw std::logic_error("The pixel (" + std::to_string(qW) + ", " +
 						std::to_string(qH) + ") in the other view is out of bounds");
@@ -131,6 +127,13 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 				else if (qW >= other->width) { qW = other->width-1; }
 		}
 	}
+
+	// Colour and gradient of this pixel
+	double pR = image.get(w,h,0);
+	double pG = image.get(w,h,1);
+	double pB = image.get(w,h,2);
+	double pGrX = gradientX.get(w,h);
+	double pGrY = gradientY.get(w,h);
 
 	// Colour and gradient of the other pixel
 	double qR = other->image.at(qW,qH,0);
@@ -207,7 +210,7 @@ double StereoImage::adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2)
 
 
 /****************************************************************************
-* > pixelTotalCost()                                                        *
+* > pixelWindowCost()                                                       *
 * Computes the total matching cost for pixel (w,h). The total cost is the   *
 * sum of all matching costs for each pixel in a square window around (w,g). *
 * Each pixel in the window is matched againts a pixel in the other view,    *
@@ -222,7 +225,7 @@ double StereoImage::adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2)
 * Returns:                                                                  *
 *   (double): window matching cost                                          *
 ****************************************************************************/
-double StereoImage::pixelTotalCost(size_t w, size_t h,
+double StereoImage::pixelWindowCost(size_t w, size_t h,
 		const PlaneFunction& disparity) const {
 	
 	// checks
@@ -231,27 +234,46 @@ double StereoImage::pixelTotalCost(size_t w, size_t h,
 				", " + std::to_string(h) + ")");
 	}
 
+	// Setting the lenght of the window
+	unsigned halfSideW = Params::WINDOW_SIZE / 2;
+	unsigned halfSideH = Params::WINDOW_SIZE / 2;
+
+	// Shrink slanted windows?
+	if (Params::resizeWindowWithCosine) {
+		double ncx = disparity.getParams().first(0);  // directional cosine of the
+		double ncy = disparity.getParams().first(1);  // normal
+		double cx = std::sqrt(1 - ncx * ncx);   // directional cosine of the plane
+		double cy = std::sqrt(1 - ncy * ncy);
+
+		halfSideW = std::round(Params::WINDOW_SIZE * cx) / 2;
+		halfSideH = std::round(Params::WINDOW_SIZE * cy) / 2;
+	}
+
 	// Setting the extremes of the window
-	unsigned halfSide = Params::WINDOW_SIZE / 2; // NOTE: assuming WINDOW_SIZE
-	                                             // is an odd number
-	size_t minW = (w > halfSide) ? (w - halfSide) : 0;
-	size_t maxW = (w + halfSide >= width) ? (width - 1) : (w + halfSide);
-	size_t minH = (h > halfSide) ? (h - halfSide) : 0;
-	size_t maxH = (h + halfSide >= height) ? (height - 1) : (h + halfSide);
+	size_t minW = (w > halfSideW) ? (w - halfSideW) : 0;
+	size_t maxW = (w + halfSideW >= width) ? (width - 1) : (w + halfSideW);
+	size_t minH = (h > halfSideH) ? (h - halfSideH) : 0;
+	size_t maxH = (h + halfSideH >= height) ? (height - 1) : (h + halfSideH);
 
 	// Scan each pixel in the window
 	double totalCost = 0;
+	int nPixels = 0;
 	for (size_t iW = minW; iW <= maxW; ++iW) {
 		for (size_t iH = minH; iH <= maxH; ++iH) {
 
+			// Is this a valid cost?
+			double dissimilarity = pixelDissimilarity(iW, iH, disparity);
+			if (std::isnan(dissimilarity)) {
+				continue;
+			}
+
 			// Accumulate the total with the current pixel
-			totalCost += adaptiveWeight(w, h, iW, iH) *
-					pixelDissimilarity(iW, iH, disparity);
+			totalCost += adaptiveWeight(w, h, iW, iH) * dissimilarity;
+			++nPixels;
 		}
 	}
 
 	// Normalizing the cost
-	int nPixels = static_cast<int>(maxW+1-minW) * static_cast<int>(maxH+1-minH);
 	double total = totalCost / nPixels;
 
 	return total;
@@ -367,12 +389,12 @@ bool StereoImage::pixelSpatialPropagation(size_t w, size_t h,
 
 	// 
 	bool modified = false;
-	double thisCost = pixelTotalCost(w, h, disparityPlanes.get(w, h));
+	double thisCost = pixelWindowCost(w, h, disparityPlanes.get(w, h));
 
 	// Left
 	if (hasHorizontalPixel) {
 		auto&& horzPlane = disparityPlanes.get(horzW, h);
-		double horzCost = pixelTotalCost(w, h, horzPlane);
+		double horzCost = pixelWindowCost(w, h, horzPlane);
 		if (horzCost < thisCost) {
 			disparityPlanes(w, h) = horzPlane;
 			modified = true;
@@ -382,7 +404,7 @@ bool StereoImage::pixelSpatialPropagation(size_t w, size_t h,
 	// Right
 	if (hasVerticalPixel) {
 		auto&& vertPlane = disparityPlanes.get(w, vertH);
-		double vertCost = pixelTotalCost(w, h, vertPlane);
+		double vertCost = pixelWindowCost(w, h, vertPlane);
 		if (vertCost < thisCost) {
 			disparityPlanes(w, h) = vertPlane;
 			modified = true;
@@ -430,8 +452,8 @@ bool StereoImage::pixelViewPropagation(size_t w, size_t h) {
 			if (oDispW == w) {
 
 				// Test plane
-				double otherCost = pixelTotalCost(w, h, otherPlane);
-				double thisCost = pixelTotalCost(w, h, disparityPlanes.get(w, h));
+				double otherCost = pixelWindowCost(w, h, otherPlane);
+				double thisCost = pixelWindowCost(w, h, disparityPlanes.get(w, h));
 				if (otherCost < thisCost) {
 					disparityPlanes(w, h) = otherPlane;
 					modified = true;
