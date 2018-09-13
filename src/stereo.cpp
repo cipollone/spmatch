@@ -211,17 +211,19 @@ double StereoImage::adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2)
 * Computes the total matching cost for pixel (w,h). The total cost is the   *
 * sum of all matching costs for each pixel in a square window around (w,g). *
 * Each pixel in the window is matched againts a pixel in the other view,    *
-* according to the disparity function of (w,h).                             *
+* according to the disparity function 'disparity'.                          *
 * NOTE: Out of bounds pixels are ignored.                                   *
 *                                                                           *
 * Args:                                                                     *
 *   w (size_t): width coordinate of the pixel                               *
 *   h (size_t): height coordinate of the pixel                              *
+*   disparity (PlaneFunction): disparity plane                              *
 *                                                                           *
 * Returns:                                                                  *
 *   (double): window matching cost                                          *
 ****************************************************************************/
-double StereoImage::pixelTotalCost(size_t w, size_t h) const {
+double StereoImage::pixelTotalCost(size_t w, size_t h,
+		const PlaneFunction& disparity) const {
 	
 	// checks
 	if (w >= width || h >= height) {
@@ -236,9 +238,6 @@ double StereoImage::pixelTotalCost(size_t w, size_t h) const {
 	size_t maxW = (w + halfSide >= width) ? (width - 1) : (w + halfSide);
 	size_t minH = (h > halfSide) ? (h - halfSide) : 0;
 	size_t maxH = (h + halfSide >= height) ? (height - 1) : (h + halfSide);
-
-	// The disparity plane
-	const PlaneFunction& disparity = disparityPlanes.get(w, h);
 
 	// Scan each pixel in the window
 	double totalCost = 0;
@@ -334,6 +333,114 @@ void StereoImage::setRandomDisparities(void) {
 					Params::MIN_D, Params::MAX_D);
 		}
 	}
+}
+
+
+/****************************************************************************
+* > pixelSpatialPropagation()                                               *
+* Spatial propagation step for a single pixel. If the plane of a spatial    *
+* neighbor of p = (w,h) has a lower cost than the current plane of p, that  *
+* plane is assigned to p. If iteration is an even number, the neighbors are *
+* the left and upper pixels.                                                *
+* NOTE: bounds are not checked                                              *
+*                                                                           *
+* Args:                                                                     *
+*   w (size_t), h (size_t): coordinates of the pixel to check               *
+*   iteration (unsigned): the iteration number                              *
+*                                                                           *
+* Returns:                                                                  *
+*   (bool): true if the plane of p has been modified                        *
+****************************************************************************/
+bool StereoImage::pixelSpatialPropagation(size_t w, size_t h,
+		unsigned iteration) {
+
+	// Direction
+	int direction = (iteration % 2 == 0) ? -1 : 1;
+
+	// Do the neighbors exist?
+	bool hasHorizontalPixel = (direction == -1) ? (w > 0) : (w < width-1);
+	bool hasVerticalPixel = (direction == -1) ? (h > 0) : (h < height-1);
+
+	// Neighbors
+	size_t horzW = w + direction;  // modular arithmetic
+	size_t vertH = h + direction;
+
+	// 
+	bool modified = false;
+	double thisCost = pixelTotalCost(w, h, disparityPlanes.get(w, h));
+
+	// Left
+	if (hasHorizontalPixel) {
+		auto&& horzPlane = disparityPlanes.get(horzW, h);
+		double horzCost = pixelTotalCost(w, h, horzPlane);
+		if (horzCost < thisCost) {
+			disparityPlanes(w, h) = horzPlane;
+			modified = true;
+		}
+	}
+
+	// Right
+	if (hasVerticalPixel) {
+		auto&& vertPlane = disparityPlanes.get(w, vertH);
+		double vertCost = pixelTotalCost(w, h, vertPlane);
+		if (vertCost < thisCost) {
+			disparityPlanes(w, h) = vertPlane;
+			modified = true;
+		}
+	}
+
+	return modified;
+}
+
+
+/*****************************************************************************
+* > pixelViewPropagation                                                     *
+* View propagation step for a single pixel. It checks whether some pixels in *
+* the other view have the current pixel p as a matching point. If any of     *
+* those pixels' planes have lower cost with p, that plane is assigned to p.  *
+* NOTE: the cost is proportional in the number of pixels                     *
+* NOTE: the plane of the other view is not transformed into this view        *
+* NOTE: bounds are not checked                                               *
+*                                                                            *
+* Args:                                                                      *
+*   w (size_t), h (size_t): coordinates of the pixel to check                *
+*                                                                            *
+* Returns:                                                                   *
+*   (bool): true if the plane of (w,h) has been modified                     *
+*****************************************************************************/
+bool StereoImage::pixelViewPropagation(size_t w, size_t h) {
+
+	// check
+	if (other == nullptr) {
+		throw std::logic_error("Instance not bound");
+	}
+
+	bool modified = false;
+
+	// Scan the other image
+	for (size_t oW = 0; oW < width; ++oW) {
+		for (size_t oH = 0; oH < height; ++oH) {
+
+			// Find a plane that matches the current pixel
+			auto&& otherPlane = other->disparityPlanes.get(oW, oH);
+			int oDisparity = std::lround(otherPlane(oW, oH));
+			int sign = (other->side == Side::LEFT) ? -1 : +1;
+			size_t oDispW = oW + sign * oDisparity;
+
+			if (oDispW == w) {
+
+				// Test plane
+				double otherCost = pixelTotalCost(w, h, otherPlane);
+				double thisCost = pixelTotalCost(w, h, disparityPlanes.get(w, h));
+				if (otherCost < thisCost) {
+					disparityPlanes(w, h) = otherPlane;
+					modified = true;
+				}
+			}
+		}
+	}
+
+	return modified;
 }
 
 

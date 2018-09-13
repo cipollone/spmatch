@@ -73,6 +73,8 @@ class StereoImage {
 		double pixelDissimilarity(size_t w, size_t h,
 				const PlaneFunction& disparity) const;
 		double adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2) const;
+		double pixelTotalCost(size_t w, size_t h, const PlaneFunction& d) const;
+		double disparityAt(size_t w, size_t h) const;
 	
 	public:
 
@@ -82,15 +84,15 @@ class StereoImage {
 		StereoImage(StereoImage&&) = default;
 
 		// const methods
-		double disparityAt(size_t w, size_t h) const;
 		void displayGradients(void) const;
-		double pixelTotalCost(size_t w, size_t h) const;
 		Image getDisparityMap(void) const;
 
 		// methods
 		void bind(StereoImage* o);
 		void unbind(void);
 		void setRandomDisparities(void);
+		bool pixelSpatialPropagation(size_t w, size_t h, unsigned iteration);
+		bool pixelViewPropagation(size_t w, size_t h);
 };
 
 
