@@ -7,9 +7,9 @@
 #include <vector>
 #include <random>
 
+#include "params.hpp"
 
 using std::string;
-using std::unique_ptr;
 
 
 /**************************************************************************
@@ -187,3 +187,21 @@ class RandomDevice {
 	public:
 		std::random_device rndDev;
 };
+
+
+/*************************************************************************
+* > logMsg()                                                             *
+* Log messages. Prints to stdout the message if the current log level is *
+* above or equal 'level'.                                                *
+* NOTE: using std::flush. May slow down the process                      *
+*                                                                        *
+* Args:                                                                  *
+*   message (string): the message to print.                              *
+*   level (int): the log level of this message.                          *
+*   end (char): separator character; defaults to '\n'.                   *
+*************************************************************************/
+inline void logMsg(const string& message, int level, char end='\n') {
+	if (Params::LOG >= level) {
+		std::cout << message << end << std::flush;
+	}
+}

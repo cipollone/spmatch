@@ -3,6 +3,7 @@
 
 #define DEBUGGING
 
+#include <chrono>
 #include "stereo.hpp"
 
 
@@ -15,18 +16,20 @@ void debug(void) {
 
 	// Just testing here
 
-	// Testing out of bound pixels in the other view
-	StereoImage s1("tests/cones/im2.png", StereoImage::LEFT);
-	StereoImage s2("tests/cones/im6.png", StereoImage::RIGHT);
-	s1.bind(&s2);
+	// timing pixelViewPropagation()
 
-	//cout << s1.pixelWindowCost(18, 5, PlaneFunction().setRandomFunction(18,5, 0,20)) << endl;
-	
-	cout << s1.pixelWindowCost(21, 5, PlaneFunction()) << endl;
-	cout << s1.pixelWindowCost(2, 2, PlaneFunction()) << endl;
-	cout << s1.pixelWindowCost(448, 1, PlaneFunction()) << endl;
-	cout << s1.pixelWindowCost(449, 373, PlaneFunction()) << endl;
-	cout << s1.pixelWindowCost(1, 374, PlaneFunction()) << endl;
-	cout << s1.pixelWindowCost(0, 1, PlaneFunction()) << endl;
+	StereoImagePair pair("tests/small/im2.png", "tests/small/im6.png");
+	//auto t1 = std::chrono::high_resolution_clock::now();
+	pair.leftImg.pixelViewPropagation(10, 30);
+	//auto t2 = std::chrono::high_resolution_clock::now();
+	//std::chrono::duration<double, std::milli> duration = t2 - t1;
+	//cout << duration.count() << endl;
+
+	/*
+	StereoImagePair pair("tests/small/im2.png", "tests/small/im6.png");
+	Image disparity = pair.computeDisparity();
+	disparity.setPath("leftDisparity.png");
+	disparity.write();
+	*/
 
 }

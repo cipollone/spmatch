@@ -468,16 +468,98 @@ bool StereoImage::pixelViewPropagation(size_t w, size_t h) {
 
 // > class StereoImagePair
 
-/********************************************************************
-* > computeDisparity()                                              *
-* Computes the disparity map of the two images using the PatchMatch *
-* Stereo algorithm.                                                 *
-*                                                                   *
-* Returns:                                                          *
-*   (Image): the disparity map                                      *
-********************************************************************/
+/******************************************************
+* > StereoImagePair()                                 *
+* Constructor.                                        *
+*                                                     *
+* Args:                                               *
+*   leftImgPath (string): path of the left RGB view   *
+*   rightImgPath (string): path of the right RGB view *
+******************************************************/
+StereoImagePair::StereoImagePair(const string& leftImgPath,
+		const string& rightImgPath):
+		leftImg(leftImgPath, StereoImage::LEFT),
+		rightImg(rightImgPath, StereoImage::RIGHT),
+		width(leftImg.size().first),
+		height(leftImg.size().second) {
+		
+	leftImg.bind(&rightImg);
+}
+
+/************************************************************************
+* > computeDisparity()                                                  *
+* Computes the disparity map of the two images using the PatchMatch     *
+* Stereo algorithm. In even iterations we proceed left to right, top to *
+* bottom; in odd iterations, in the opposite direction. See the         *
+* reference paper for more.                                             *
+*                                                                       *
+* Returns:                                                              *
+*   (Image): the disparity map of the left view                         *
+************************************************************************/
 Image StereoImagePair::computeDisparity(void) {
-	// TODO: remove the placeholder
-	return Image("../tests/cones/all.png");
+
+	// Random Initialization
+	leftImg.setRandomDisparities();
+	rightImg.setRandomDisparities();
+
+	logMsg("Random Initialization done", 1);
+
+	// For each iteration
+	for (unsigned i = 0; i < Params::ITERATIONS; ++i) {
+
+		// Select the direction
+		int increment = (i % 2 == 0) ? 1 : -1;
+		size_t wFirst, wLast, hFirst, hLast;
+		if (increment > 0) {  // start from 0
+			wFirst = 0;
+			hFirst = 0;
+			wLast = width - 1;
+			hLast = height - 1;
+		} else {   // start from the end
+			wFirst = width - 1;
+			hFirst = height - 1;
+			wLast = 0;
+			hLast = 0;
+		}
+
+		// For each of the two images
+		auto image = &leftImg;
+		for (unsigned v = 0; v < 2; ++v, image = &rightImg) {
+
+			// For each pixel: row major order.
+			//		NOTE: whole image, not ignoring lateral bands
+			for (size_t h = hFirst; true; h += increment) {
+				for (size_t w = wFirst; true; w += increment) {
+					logMsg("("+std::to_string(w)+","+std::to_string(h)+")", 2, ' ');
+
+					// Spatial propagation
+					image->pixelSpatialPropagation(w, h, i);
+					logMsg("pixelSpatialPropagation();", 3, ' ');
+
+					// View propagation
+					image->pixelViewPropagation(w, h);
+					logMsg("pixelViewPropagation();", 3, ' ');
+
+					// NOTE: No temporal propagation for images
+					
+					// Plane refinement TODO
+
+					logMsg("", 3, '\n');
+
+					if (w == wLast) break;
+				}
+				if (h == hLast) break;
+			}
+
+			logMsg("Image done." , 1);
+		}
+
+		logMsg("Iteration: "+std::to_string(i), 1);
+	}
+
+	// Post processing TODO
+
+	// Return the left map
+	return leftImg.getDisparityMap();
 }
 
