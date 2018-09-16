@@ -71,7 +71,7 @@ class StereoImage {
 ************************************************************************/
 class StereoImagePair {
 	
-	public: // TODO
+	private:
 
 		StereoImage leftImg;
 		StereoImage rightImg;

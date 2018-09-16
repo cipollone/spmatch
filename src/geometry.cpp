@@ -166,7 +166,7 @@ Vector3d Plane::randomNormal(void) {
 
 // > class PlaneFunction
 
-const double PlaneFunction::Z_EPS = 0.1;
+const double PlaneFunction::Z_EPS = 0.5; // NOTE: max 60° planes
 
 
 /***************************************************************************

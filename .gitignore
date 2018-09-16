@@ -2,6 +2,7 @@
 /build
 /tests
 /compile_commands.json
+/temp
 
 # Vim
 *.swp

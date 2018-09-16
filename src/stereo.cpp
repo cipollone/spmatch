@@ -1,6 +1,8 @@
 
 #include "stereo.hpp"
 
+using std::to_string;
+
 
 // > class StereoImage
 
@@ -27,7 +29,7 @@ StereoImage::StereoImage(const string& imgPath, Side side):
 	CImgList<double> gradients;
 	grayscale.getCImg().get_gradient("xy", 2).move_to(gradients);
 
-	if (Params::NORMALIZE_GRADIENTS) {
+	if (params.NORMALIZE_GRADIENTS) {
 		gradients(0).normalize(0,255);
 		gradients(1).normalize(0,255);
 	}
@@ -61,8 +63,8 @@ double StereoImage::disparityAt(size_t w, size_t h) const {
 * Visualizes the x,y gradient images (renormalized in 0-255). *
 **************************************************************/
 void StereoImage::displayGradients(void) const {
-	gradientX.display("Gradient X");
-	gradientY.display("Gradient Y");
+	gradientX.display();
+	gradientY.display();
 }
 
 
@@ -74,7 +76,7 @@ void StereoImage::displayGradients(void) const {
 * See the reference paper, PatchMatch Stereo, for the function definition. *
 * NOTE: requires a bound instance and an RGB image.                        *
 * NOTE: the result for out-of-bounds coordinates is specified by           *
-* Params::OUT_OF_BOUNDS.                                                   *
+* params.OUT_OF_BOUNDS.                                                    *
 * NOTE: pay attention at implicit conversions int -> size_t.               *
 *                                                                          *
 * Args:                                                                    *
@@ -92,13 +94,19 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 		throw std::logic_error("Instance not bound");
 	}
 	if (w >= width || h >= height) {
-		throw std::runtime_error("Out of bounds (" + std::to_string(w) +
-				", " + std::to_string(h) + ")");
+		throw std::runtime_error("Out of bounds (" + to_string(w) +
+				", " + to_string(h) + ")");
+	}
+
+	// Disparity
+	double d = disparity(w, h); // NOTE: this disparity can exceed the limits
+	                            //   We will just check out of bounds, for now
+	if (params.planesSaturation) { // TODO: is it useful?
+		if (d > params.MAX_D) d = params.MAX_D;
+		if (d < params.MIN_D) d = params.MIN_D;
 	}
 
 	// Coordinates of the other pixel
-	double d = disparity(w, h); // NOTE: this disparity can exceed the limits
-	                            //   We will just check out of bounds, for now
 	int sign;
 	switch (side) {
 		case LEFT: sign = -1; break;
@@ -112,14 +120,14 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 	if (qW < 0 || qW >= other->width) {
 		qIsOut = true;
 
-		switch (Params::OUT_OF_BOUNDS) {
+		switch (params.OUT_OF_BOUNDS) {
 			case Params::OutOfBounds::ZERO_COST:
 				return 0;
 			case Params::OutOfBounds::NAN_COST:
 				return std::numeric_limits<double>::quiet_NaN();
 			case Params::OutOfBounds::ERROR:
-				throw std::logic_error("The pixel (" + std::to_string(qW) + ", " +
-						std::to_string(qH) + ") in the other view is out of bounds");
+				throw std::logic_error("The pixel (" + to_string(qW) + ", " +
+						to_string(qH) + ") in the other view is out of bounds");
 			case Params::OutOfBounds::REPEAT_PIXEL:
 				qIsOut = false;		// false means solved; no 'break;' here
 			case Params::OutOfBounds::BLACK_PIXEL:
@@ -143,7 +151,7 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 	double qGrY = other->gradientY.at(qW,qH,0);
 
 	// Is (qW, qH) out of the image?
-	if (qIsOut && Params::OUT_OF_BOUNDS == Params::OutOfBounds::BLACK_PIXEL) {
+	if (qIsOut && params.OUT_OF_BOUNDS == Params::OutOfBounds::BLACK_PIXEL) {
 		qR = 0; qG = 0; qB = 0;
 		qGrX = 0; qGrY = 0;
 	}
@@ -155,8 +163,8 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 			std::abs(pG - qG) +
 			std::abs(pB - qB);      // NOTE: L1
 
-	double res = (1 - Params::ALFA) * std::min(colourDist, Params::TAU_COL) +
-			Params::ALFA * std::min(gradientDist, Params::TAU_GRAD);
+	double res = (1 - params.ALFA) * std::min(colourDist, params.TAU_COL) +
+			params.ALFA * std::min(gradientDist, params.TAU_GRAD);
 	
 	return res;
 }
@@ -183,12 +191,12 @@ double StereoImage::adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2)
 
 	// checks
 	if (w1 >= width || h1 >= height) {
-		throw std::runtime_error("Out of bounds (" + std::to_string(w1) +
-				", " + std::to_string(h1) + ")");
+		throw std::runtime_error("Out of bounds (" + to_string(w1) +
+				", " + to_string(h1) + ")");
 	}
 	if (w2 >= width || h2 >= height) {
-		throw std::runtime_error("Out of bounds (" + std::to_string(w2) +
-				", " + std::to_string(h2) + ")");
+		throw std::runtime_error("Out of bounds (" + to_string(w2) +
+				", " + to_string(h2) + ")");
 	}
 
 	// Colour of the first point
@@ -205,7 +213,7 @@ double StereoImage::adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2)
 			std::abs(p1G - p2G) +
 			std::abs(p1B - p2B);
 
-	return std::exp(-colourDist/Params::GAMMA);
+	return std::exp(-colourDist/params.GAMMA);
 }
 
 
@@ -230,23 +238,23 @@ double StereoImage::pixelWindowCost(size_t w, size_t h,
 	
 	// checks
 	if (w >= width || h >= height) {
-		throw std::runtime_error("Out of bounds (" + std::to_string(w) +
-				", " + std::to_string(h) + ")");
+		throw std::runtime_error("Out of bounds (" + to_string(w) +
+				", " + to_string(h) + ")");
 	}
 
 	// Setting the lenght of the window
-	unsigned halfSideW = Params::WINDOW_SIZE / 2;
-	unsigned halfSideH = Params::WINDOW_SIZE / 2;
+	unsigned halfSideW = params.WINDOW_SIZE / 2;
+	unsigned halfSideH = params.WINDOW_SIZE / 2;
 
 	// Shrink slanted windows?
-	if (Params::resizeWindowWithCosine) {
+	if (params.resizeWindowWithCosine) {
 		double ncx = disparity.getParams().first(0);  // directional cosine of the
 		double ncy = disparity.getParams().first(1);  // normal
 		double cx = std::sqrt(1 - ncx * ncx);   // directional cosine of the plane
 		double cy = std::sqrt(1 - ncy * ncy);
 
-		halfSideW = std::round(Params::WINDOW_SIZE * cx) / 2;
-		halfSideH = std::round(Params::WINDOW_SIZE * cy) / 2;
+		halfSideW = std::round(params.WINDOW_SIZE * cx) / 2;
+		halfSideH = std::round(params.WINDOW_SIZE * cy) / 2;
 	}
 
 	// Setting the extremes of the window
@@ -263,9 +271,7 @@ double StereoImage::pixelWindowCost(size_t w, size_t h,
 
 			// Is this a valid cost?
 			double dissimilarity = pixelDissimilarity(iW, iH, disparity);
-			if (std::isnan(dissimilarity)) {
-				continue;
-			}
+			if (std::isnan(dissimilarity)) { continue; }
 
 			// Accumulate the total with the current pixel
 			totalCost += adaptiveWeight(w, h, iW, iH) * dissimilarity;
@@ -292,7 +298,15 @@ Image StereoImage::getDisparityMap(void) const {
 	Image disp(width, height, 1);
 	for (size_t w = 0; w < width; ++w) {
 		for (size_t h = 0; h < height; ++h) {
-			disp(w, h) = disparityAt(w, h);
+
+			double d = disparityAt(w, h);
+
+			// Saturation TODO: why correct values saturate if the max should be 50?
+			/*
+			if (d > params.MAX_D) d = params.MAX_D;
+			if (d < params.MIN_D) d = params.MIN_D;
+			*/
+			disp(w, h) = d;
 		}
 	}
 
@@ -345,14 +359,14 @@ void StereoImage::unbind(void) {
 * > setRandomDisparities()                                            *
 * Set all 'disparityPlanes' to random linear functions. The range of  *
 * disparity values in the central pixel of each plane is given by the *
-* parameters [Params::MIN_D, Params::MAX_D]                           *
+* parameters [params.MIN_D, params.MAX_D]                             *
 **********************************************************************/
 void StereoImage::setRandomDisparities(void) {
 
 	for (size_t w = 0; w < width; ++w) {
 		for (size_t h = 0; h < height; ++h) {
 			disparityPlanes(w, h).setRandomFunction(w, h,
-					Params::MIN_D, Params::MAX_D);
+					params.MIN_D, params.MAX_D);
 		}
 	}
 }
@@ -391,7 +405,7 @@ bool StereoImage::pixelSpatialPropagation(size_t w, size_t h,
 	bool modified = false;
 	double thisCost = pixelWindowCost(w, h, disparityPlanes.get(w, h));
 
-	// Left
+	// Horizontal
 	if (hasHorizontalPixel) {
 		auto&& horzPlane = disparityPlanes.get(horzW, h);
 		double horzCost = pixelWindowCost(w, h, horzPlane);
@@ -401,7 +415,7 @@ bool StereoImage::pixelSpatialPropagation(size_t w, size_t h,
 		}
 	}
 
-	// Right
+	// Vertical
 	if (hasVerticalPixel) {
 		auto&& vertPlane = disparityPlanes.get(w, vertH);
 		double vertCost = pixelWindowCost(w, h, vertPlane);
@@ -410,6 +424,8 @@ bool StereoImage::pixelSpatialPropagation(size_t w, size_t h,
 			modified = true;
 		}
 	}
+	logMsg("cost " + to_string(thisCost) + ", newCost " + 
+			to_string(disparityPlanes(w,h)(w,h)), 3, ' ');
 
 	return modified;
 }
@@ -501,11 +517,10 @@ Image StereoImagePair::computeDisparity(void) {
 	// Random Initialization
 	leftImg.setRandomDisparities();
 	rightImg.setRandomDisparities();
-
 	logMsg("Random Initialization done", 1);
 
 	// For each iteration
-	for (unsigned i = 0; i < Params::ITERATIONS; ++i) {
+	for (unsigned i = 0; i < params.ITERATIONS; ++i) {
 
 		// Select the direction
 		int increment = (i % 2 == 0) ? 1 : -1;
@@ -524,27 +539,33 @@ Image StereoImagePair::computeDisparity(void) {
 
 		// For each of the two images
 		auto image = &leftImg;
-		for (unsigned v = 0; v < 2; ++v, image = &rightImg) {
+		for (unsigned v = 0; v < 1; ++v, image = &rightImg) { // TODO: 2 images
 
 			// For each pixel: row major order.
 			//		NOTE: whole image, not ignoring lateral bands
 			for (size_t h = hFirst; true; h += increment) {
+				logMsg("(_,"+to_string(h)+")", 2, ' ', true);
+
 				for (size_t w = wFirst; true; w += increment) {
-					logMsg("("+std::to_string(w)+","+std::to_string(h)+")", 2, ' ');
+					logMsg("("+to_string(w)+","+to_string(h)+")", 3, ' ');
 
 					// Spatial propagation
 					image->pixelSpatialPropagation(w, h, i);
 					logMsg("pixelSpatialPropagation();", 3, ' ');
 
 					// View propagation
-					image->pixelViewPropagation(w, h);
-					logMsg("pixelViewPropagation();", 3, ' ');
+					//image->pixelViewPropagation(w, h);
+					////logMsg("pixelViewPropagation();", 3, ' '); TODO: more efficient
 
 					// NOTE: No temporal propagation for images
 					
 					// Plane refinement TODO
 
 					logMsg("", 3, '\n');
+
+					// TODO: remove this 'breakpoint'
+					//if (h == 50 && w == 33) return leftImg.getDisparityMap();
+
 
 					if (w == wLast) break;
 				}
@@ -554,7 +575,7 @@ Image StereoImagePair::computeDisparity(void) {
 			logMsg("Image done." , 1);
 		}
 
-		logMsg("Iteration: "+std::to_string(i), 1);
+		logMsg("Iteration done #"+to_string(i), 1);
 	}
 
 	// Post processing TODO

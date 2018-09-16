@@ -139,21 +139,6 @@ double Image::at(double w, double h, size_t c) const {
 }
 
 
-/*************************************************
-* > display()                                    *
-* Show the image in a new window                 *
-*                                                *
-* Args:                                          *
-*   windowName (string): the title of the window *
-*************************************************/
-void Image::display(string windowName) const {
-	CImgDisplay disp(img, windowName.c_str());
-	while (!disp.is_closed()) {
-		disp.wait();
-	}
-}
-
-
 /*****************************************************************************
 * > toGrayscale()                                                            *
 * Creates a new grayscale image from the current one using the ``luminance'' *

@@ -49,12 +49,13 @@ class Image {
 		double get(size_t w, size_t h) const { return img(w,h); }
 		double at(double w, double h, size_t c) const;
 		const CImg<double>& getCImg(void) const { return img; }
-		void display(string windowName="") const;
+		void display(void) const { img.display(); }
 		void write(void) const { img.save(imgPath.c_str()); }
 		Image toGrayscale(void) const;
 
 		// methods
 		void setPath(const string& path) { imgPath = path; }
+		void normalize(void) { img.normalize(0, 255); }
 
 		// operators
 		Image& operator=(const Image&) = delete;
