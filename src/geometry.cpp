@@ -1,10 +1,13 @@
 
 #include "geometry.hpp"
+#include "utils.hpp"
+
+#include <cmath>
+#include <random>
 
 
 // > class Plane
 
-RandomDevice Plane::rndDev;
 
 /**************************************************************************
 * > Plane()                                                               *
@@ -79,8 +82,9 @@ Plane& Plane::setRandomPlane(double d1, double d2) {
 
 	// When the normal is an unit vector,
 	// d is just the distance of the origin (with sign)
+	auto& rand = RandomDevice::getGenerator();
 	std::uniform_real_distribution<double> uniform(d1, d2);
-	d = uniform(rndDev.rndDev);
+	d = uniform(rand.engine);
 
 	return *this;
 }
@@ -149,15 +153,16 @@ std::ostream& operator<<(std::ostream& out, const Plane& p) {
 * Returns:                                                      *
 *   (Vector3d): the random unit vector                          *
 ****************************************************************/
-Vector3d Plane::randomNormal(void) {
+Vector3d Plane::randomNormal(void) const {
 
 	// The 3d unit normal distribution uniformly samples
 	// directions on the sphere
 	std::normal_distribution<double> normalDist;
+	auto& rand = RandomDevice::getGenerator();
 
-	Vector3d v { normalDist(rndDev.rndDev),
-			normalDist(rndDev.rndDev),
-			normalDist(rndDev.rndDev) };
+	Vector3d v { normalDist(rand.engine),
+			normalDist(rand.engine),
+			normalDist(rand.engine) };
 	v.normalize();
 
 	return v;
@@ -240,7 +245,8 @@ PlaneFunction& PlaneFunction::setRandomPlane(double d1, double d2) {
 	// When the normal is an unit vector,
 	// d is just the distance of the origin (with sign)
 	std::uniform_real_distribution<double> uniform(d1, d2);
-	d = uniform(rndDev.rndDev);
+	auto& rand = RandomDevice::getGenerator();
+	d = uniform(rand.engine);
 
 	return *this;
 }
@@ -267,7 +273,8 @@ PlaneFunction& PlaneFunction::setRandomFunction(double x, double y,
 	
 	// point
 	std::uniform_real_distribution<double> uniform(min, max);
-	double zValue = uniform(rndDev.rndDev);
+	auto& rand = RandomDevice::getGenerator();
+	double zValue = uniform(rand.engine);
 
 	// normal
 	// Generate a non-vertical plane

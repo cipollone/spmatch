@@ -2,10 +2,7 @@
 #pragma once
 
 #include <iostream>
-#include <cmath>
 #include <Eigen/Core>
-
-#include "utils.hpp"
 
 
 using Eigen::Vector3d;
@@ -26,16 +23,16 @@ class Plane {
 		Vector3d abc;
 		double d;
 
-		static RandomDevice rndDev;
+	protected:
 
 		// methods
-		static Vector3d randomNormal(void);
+		Vector3d randomNormal(void) const;
 
 	public:
 
 		// construct
-		Plane(void): abc(1,0,0), d(0) {}
 		Plane(double a, double b, double c, double d);
+		Plane(void): Plane(1,0,0,0) {}
 		Plane(const Vector3d abc, double d);
 
 		// const methods

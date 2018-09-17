@@ -15,6 +15,7 @@
 #include <boost/program_options.hpp>
 
 #include "params.hpp"
+#include "stereo.hpp"
 
 
 namespace po = boost::program_options;
@@ -31,7 +32,6 @@ Params params;
 void setDefaults(void);
 void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
 		const string& disparityPath);
-void debug(void);
 
 
 // main
@@ -72,10 +72,13 @@ int main(int argc, char *argv[]) {
 				"Whether the gradient map should be normalized")
 			("out_of_bounds", po::value<Params::OutOfBounds>(&params.OUT_OF_BOUNDS),
 				"Out of bounds action. One of {repeat, black, zero, error, nan}")
-			("resize_window", po::value<bool>(&params.resizeWindowWithCosine)
+			("resize_window", po::value<bool>(&params.RESIZE_WINDOWS)
 				->implicit_value(true),
 				"Whether slanted windows should be smaller")
-			("planes_saturation", po::value<bool>(&params.planesSaturation)
+			("planes_saturation", po::value<bool>(&params.PLANES_SATURATION)
+				->implicit_value(true),
+				"Force any internal value to be saturated")
+			("use_pseudorand", po::value<bool>(&params.USE_PSEUDORAND)
 				->implicit_value(true),
 				"Force any internal value to be saturated")
 	;
@@ -112,8 +115,8 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	// run TODO attach
-	//writeDisparityMap(imagesPath[0],  imagesPath[1], outputPath);
+	// run
+	writeDisparityMap(inputImages.at(0), inputImages.at(1), outputPath);
 
 	return 0;
 }
@@ -148,8 +151,9 @@ void setDefaults(void) {
 	// Flag parameters
 	params.NORMALIZE_GRADIENTS = true; // With this false, TAU_GRAD must also change
 	params.OUT_OF_BOUNDS = Params::OutOfBounds::NAN_COST;
-	params.resizeWindowWithCosine = true;
-	params.planesSaturation = false;
+	params.RESIZE_WINDOWS = true;
+	params.PLANES_SATURATION = false;
+	params.USE_PSEUDORAND = false;
 	params.LOG = 2;               // {0,...,3}. 0 means off
 
 }
@@ -168,30 +172,16 @@ void setDefaults(void) {
 void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
 		const string& disparityPath) {
 
-	// TODO
-	/*
 	// Read the two stereo images
 	StereoImagePair stereo(leftImgPath, rightImgPath);
 
 	// Run the algorithm
 	Image disparity = stereo.computeDisparity();
 	
-	// Write the result
-	// todo
-	
-	// todo: remove this
-	disparity.display("Disparity");
-	*/
-
-}
-
-
-void debug(void) {
-
-	// Just testing here
-	//
-	// Testing the input files
-	
+	// Testing the result
+	disparity.setPath(disparityPath);
+	disparity.write();
+	disparity.display();
 }
 
 

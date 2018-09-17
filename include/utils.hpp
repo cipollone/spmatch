@@ -4,7 +4,6 @@
 #include <string>
 #include <iostream>
 #include <sstream>
-#include <memory>
 #include <vector>
 #include <random>
 
@@ -179,14 +178,40 @@ std::ostream& operator<<(std::ostream& o, const Grid<T>& g) {
 }
 
 
-/**************************
-* > class RandomDevice    *
-* A global random device  *
-**************************/
+/***********************************************************
+* > class RandomDevice                                     *
+* A single-instance class that serves as the global random *
+* numbers generator.                                       *
+***********************************************************/
 class RandomDevice {
 
+	private:
+
+		std::random_device device;
+
 	public:
-		std::random_device rndDev;
+
+		std::default_random_engine engine;
+
+	private:
+
+		// Can't instantiate directly
+		RandomDevice(void) {
+			if (!params.USE_PSEUDORAND) {
+				engine.seed(device());
+			}
+		}
+
+	public:
+
+		RandomDevice(const RandomDevice&) = delete;
+		void operator=(const RandomDevice&) = delete;
+
+		// Getter of the global object
+		static RandomDevice& getGenerator(void) {
+			static RandomDevice generator;
+			return generator;
+		}
 };
 
 

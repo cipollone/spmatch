@@ -101,7 +101,7 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 	// Disparity
 	double d = disparity(w, h); // NOTE: this disparity can exceed the limits
 	                            //   We will just check out of bounds, for now
-	if (params.planesSaturation) { // TODO: is it useful?
+	if (params.PLANES_SATURATION) { // TODO: is it useful?
 		if (d > params.MAX_D) d = params.MAX_D;
 		if (d < params.MIN_D) d = params.MIN_D;
 	}
@@ -247,7 +247,7 @@ double StereoImage::pixelWindowCost(size_t w, size_t h,
 	unsigned halfSideH = params.WINDOW_SIZE / 2;
 
 	// Shrink slanted windows?
-	if (params.resizeWindowWithCosine) {
+	if (params.RESIZE_WINDOWS) {
 		double ncx = disparity.getParams().first(0);  // directional cosine of the
 		double ncy = disparity.getParams().first(1);  // normal
 		double cx = std::sqrt(1 - ncx * ncx);   // directional cosine of the plane

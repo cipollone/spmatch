@@ -1,9 +1,6 @@
 
 #pragma once
 
-#include <string>
-#include <istream>
-
 
 /*****************************************************
 * > struct Params                                    *
@@ -30,8 +27,9 @@ struct Params {
 	// Flag parameters
 	bool NORMALIZE_GRADIENTS;      // With this false, TAU_GRAD must also change
 	OutOfBounds OUT_OF_BOUNDS;
-	bool resizeWindowWithCosine;
-	bool planesSaturation;
+	bool RESIZE_WINDOWS;
+	bool PLANES_SATURATION;
+	bool USE_PSEUDORAND;
 	int LOG;                       // {0,...,3}. 0 means off
 
 };
