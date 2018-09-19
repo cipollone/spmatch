@@ -29,7 +29,7 @@ class Grid {
 	private:
 
 		// members
-		const Order order;
+		Order order;
 		size_t nRows;
 		size_t nCols;
 

@@ -30,6 +30,7 @@ struct Params {
 	bool RESIZE_WINDOWS;
 	bool PLANES_SATURATION;
 	bool USE_PSEUDORAND;
+	bool CONST_DISPARITIES;
 	int LOG;                       // {0,...,3}. 0 means off
 
 };

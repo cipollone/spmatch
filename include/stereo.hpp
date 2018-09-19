@@ -41,7 +41,7 @@ class StereoImage {
 		double adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2) const;
 		double pixelWindowCost(size_t w, size_t h, const PlaneFunction& d) const;
 		double disparityAt(size_t w, size_t h) const;
-	
+
 	public:
 
 		// constr
@@ -60,6 +60,7 @@ class StereoImage {
 		void setRandomDisparities(void);
 		bool pixelSpatialPropagation(size_t w, size_t h, unsigned iteration);
 		bool pixelViewPropagation(size_t w, size_t h);
+		bool planeRefinement(size_t w, size_t h);
 };
 
 

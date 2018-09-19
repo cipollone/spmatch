@@ -17,6 +17,8 @@
 #include "params.hpp"
 #include "stereo.hpp"
 
+//#define DEBUG
+
 
 namespace po = boost::program_options;
 using std::string;
@@ -32,6 +34,7 @@ Params params;
 void setDefaults(void);
 void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
 		const string& disparityPath);
+void debugging(void);
 
 
 // main
@@ -80,7 +83,10 @@ int main(int argc, char *argv[]) {
 				"Force any internal value to be saturated")
 			("use_pseudorand", po::value<bool>(&params.USE_PSEUDORAND)
 				->implicit_value(true),
-				"Force any internal value to be saturated")
+				"Use pseudorandom numbers (repeatable computation)")
+			("const_disparities", po::value<bool>(&params.CONST_DISPARITIES)
+				->implicit_value(true),
+				"Always use constant planes")
 	;
 
 	po::positional_options_description positionalOpts;
@@ -115,6 +121,11 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+#ifdef DEBUG
+	debugging();
+	return 0;
+#endif // DEBUG
+
 	// run
 	writeDisparityMap(inputImages.at(0), inputImages.at(1), outputPath);
 
@@ -143,17 +154,18 @@ void setDefaults(void) {
 	params.GAMMA = 15;
 
 	// Range parameters
-	params.WINDOW_SIZE = 15;      // Must be an odd number TODO was 35
+	params.WINDOW_SIZE = 15;      // NOTE: Must be an odd number
 	params.MIN_D = 0;
-	params.MAX_D = 50;
-	params.ITERATIONS = 1;        // TODO the paper uses 3
+	params.MAX_D = 70;            // NOTE: must be positive
+	params.ITERATIONS = 1;        // TODO was 3
 
 	// Flag parameters
 	params.NORMALIZE_GRADIENTS = true; // With this false, TAU_GRAD must also change
 	params.OUT_OF_BOUNDS = Params::OutOfBounds::NAN_COST;
 	params.RESIZE_WINDOWS = true;
-	params.PLANES_SATURATION = false;
+	params.PLANES_SATURATION = true;
 	params.USE_PSEUDORAND = false;
+	params.CONST_DISPARITIES = false;
 	params.LOG = 2;               // {0,...,3}. 0 means off
 
 }
@@ -210,3 +222,12 @@ std::istream& operator>>(std::istream& in, Params::OutOfBounds& selection) {
 	return in;
 }
 
+
+void debugging(void) {
+
+	// Pixel 127,25
+	cout << "debugging" << endl;
+
+
+	exit(0);
+}
