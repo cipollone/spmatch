@@ -70,6 +70,8 @@ int main(int argc, char *argv[]) {
 			("max_d,M", po::value<int>(&params.MAX_D), "Maximum disparity")
 			("iteration,i", po::value<unsigned>(&params.ITERATIONS),
 				"Number of iterations per view")
+			("max_slope", po::value<double>(&params.MAX_SLOPE),
+				"Maximum slope of each window")
 			("normalize_gradients", po::value<bool>(
 				&params.NORMALIZE_GRADIENTS)->implicit_value(true),
 				"Whether the gradient map should be normalized")
@@ -158,6 +160,7 @@ void setDefaults(void) {
 	params.MIN_D = 0;
 	params.MAX_D = 70;            // NOTE: must be positive
 	params.ITERATIONS = 1;        // TODO was 3
+	params.MAX_SLOPE = 45;
 
 	// Flag parameters
 	params.NORMALIZE_GRADIENTS = true; // With this false, TAU_GRAD must also change
@@ -171,29 +174,44 @@ void setDefaults(void) {
 }
 
 
-/**************************************************************************
-* > writeDisparityMap()                                                   *
-* Given a pair of stereo images, saves the generated disparity map to the *
-* ouput path.                                                             *
-*                                                                         *
-* Args:                                                                   *
-*   leftImgPath (string): left image name/path                            *
-*   rightImgPath (string): right image name/path                          *
-*   disparityPath (string): output image name/path                        *
-**************************************************************************/
+/*************************************************************************
+* > writeDisparityMap()                                                  *
+* Given a pair of stereo images, saves the generated disparity maps of   *
+* the left and right view to the ouput path. The image will be saved as: *
+* <disparityPath_name>L.<disparityPath_ext>                              *
+* <disparityPath_name>R.<disparityPath_ext>                              *
+*                                                                        *
+* Args:                                                                  *
+*   leftImgPath (string): left image name/path                           *
+*   rightImgPath (string): right image name/path                         *
+*   disparityPath (string): output image name/path                       *
+*************************************************************************/
 void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
 		const string& disparityPath) {
+
+	// Set the path
+	auto extPos = disparityPath.rfind('.');
+	string leftDisparityPath = disparityPath;
+	string rightDisparityPath = disparityPath;
+	leftDisparityPath.insert(extPos, "L");
+	rightDisparityPath.insert(extPos, "R");
 
 	// Read the two stereo images
 	StereoImagePair stereo(leftImgPath, rightImgPath);
 
 	// Run the algorithm
-	Image disparity = stereo.computeDisparity();
+	auto disparities = stereo.computeDisparity();
+	Image& leftDisp = disparities.first;
+	Image& rightDisp = disparities.second;
 	
-	// Testing the result
-	disparity.setPath(disparityPath);
-	disparity.write();
-	disparity.display();
+	// Write the result
+	leftDisp.setPath(leftDisparityPath);
+	leftDisp.write();
+	rightDisp.setPath(rightDisparityPath);
+	rightDisp.write();
+
+	// NOTE: just to quickly see the result
+	leftDisp.display();
 }
 
 
@@ -225,9 +243,32 @@ std::istream& operator>>(std::istream& in, Params::OutOfBounds& selection) {
 
 void debugging(void) {
 
-	// Pixel 127,25
-	cout << "debugging" << endl;
+	// Testing random function generation
+	cout << "Testing new random functions" << endl;
+	PlaneFunction p;
+	int n = 50000;
 
+	cout << "Test 1. [0,89]" << endl;
+	for (int i = 0; i < n; ++i) {
+		p.setRandomFunction(3,5, 0,10, 0,89);
+		cout << static_cast<Plane>(p) << endl;
+	}
 
-	exit(0);
+	cout << "Test 2. [0,60]" << endl;
+	for (int i = 0; i < n; ++i) {
+		p.setRandomFunction(3,5, 0,10, 0,60);
+		cout << static_cast<Plane>(p) << endl;
+	}
+
+	cout << "Test 3. [0,30]" << endl;
+	for (int i = 0; i < n; ++i) {
+		p.setRandomFunction(3,5, 0,10, 0,30);
+		cout << static_cast<Plane>(p) << endl;
+	}
+
+	cout << "Test 4. [30,45]" << endl;
+	for (int i = 0; i < n; ++i) {
+		p.setRandomFunction(3,5, 0,10, 30,45);
+		cout << static_cast<Plane>(p) << endl;
+	}
 }

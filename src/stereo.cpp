@@ -365,18 +365,19 @@ void StereoImage::unbind(void) {
 }
 
 
-/**********************************************************************
-* > setRandomDisparities()                                            *
-* Set all 'disparityPlanes' to random linear functions. The range of  *
-* disparity values in the central pixel of each plane is given by the *
-* parameters [params.MIN_D, params.MAX_D]                             *
-**********************************************************************/
+/************************************************************************
+* > setRandomDisparities()                                              *
+* Set all 'disparityPlanes' to random linear functions. The range of    *
+* disparity values in the central pixel of each plane is given by the   *
+* parameters [params.MIN_D, params.MAX_D]. The angle of the plane is at *
+* most params.MAX_SLOPE.                                                *
+************************************************************************/
 void StereoImage::setRandomDisparities(void) {
 
 	for (size_t w = 0; w < width; ++w) {
 		for (size_t h = 0; h < height; ++h) {
 			disparityPlanes(w, h).setRandomFunction(w, h,
-					params.MIN_D, params.MAX_D);
+					params.MIN_D, params.MAX_D, 0, params.MAX_SLOPE);
 
 			// Force planar windows if requested
 			if (params.CONST_DISPARITIES) {
@@ -439,8 +440,6 @@ bool StereoImage::pixelSpatialPropagation(size_t w, size_t h,
 			modified = true;
 		}
 	}
-	logMsg("cost " + to_string(thisCost) + ", newCost " + 
-			to_string(disparityPlanes(w,h)(w,h)), 3, ' ');
 
 	return modified;
 }
@@ -544,9 +543,9 @@ StereoImagePair::StereoImagePair(const string& leftImgPath,
 * reference paper for more.                                             *
 *                                                                       *
 * Returns:                                                              *
-*   (Image): the disparity map of the left view                         *
+*   (pair<Image,Image>): the left and right disparity maps              *
 ************************************************************************/
-Image StereoImagePair::computeDisparity(void) {
+pair<Image,Image> StereoImagePair::computeDisparity(void) {
 
 	// Random Initialization
 	leftImg.setRandomDisparities();
@@ -555,6 +554,7 @@ Image StereoImagePair::computeDisparity(void) {
 
 	// For each iteration
 	for (unsigned i = 0; i < params.ITERATIONS; ++i) {
+		logMsg("Iteration #"+to_string(i+1), 1);
 
 		// Select the direction
 		int increment = (i % 2 == 0) ? 1 : -1;
@@ -573,7 +573,9 @@ Image StereoImagePair::computeDisparity(void) {
 
 		// For each of the two images
 		auto image = &leftImg;
-		for (unsigned v = 0; v < 1; ++v, image = &rightImg) { // TODO: 2 images
+		for (unsigned v = 0; v < 2; ++v, image = &rightImg) {
+			logMsg(string("Processing the ") +
+					((image == &leftImg) ? "left " : "right ") + "image" , 1);
 
 			// For each pixel: row major order.
 			//		NOTE: whole image, not ignoring lateral bands
@@ -593,25 +595,17 @@ Image StereoImagePair::computeDisparity(void) {
 					
 					// Plane refinement TODO
 
-					// TODO: remove this 'breakpoint'
-					//if (h == 50 && w == 33) return leftImg.getDisparityMap();
-
-
 					if (w == wLast) break;
 				}
 				if (h == hLast) break;
 			}
 			logMsg("", 2);
-
-			logMsg("Image done." , 1);
 		}
-
-		logMsg("Iteration done #"+to_string(i+1), 1);
 	}
 
 	// Post processing TODO
 
-	// Return the left map
-	return leftImg.getDisparityMap();
+	// Return both disparity maps
+	return {leftImg.getDisparityMap(), rightImg.getDisparityMap()};
 }
 

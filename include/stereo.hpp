@@ -64,12 +64,12 @@ class StereoImage {
 };
 
 
-/************************************************************************
-* > class StereoImagePair                                               *
-* Represents a couple of StereoImages. The method computeDisparity()    *
-* returns an disparity image computed with PatchMatch Stereo algorithm. *
-* See .cpp file                                                         *
-************************************************************************/
+/**************************************************************************
+* > class StereoImagePair                                                 *
+* Represents a couple of StereoImages. The method computeDisparity()      *
+* returns two disparity images computed with PatchMatch Stereo algorithm. *
+* See .cpp file                                                           *
+**************************************************************************/
 class StereoImagePair {
 	
 	private:
@@ -86,6 +86,6 @@ class StereoImagePair {
 		StereoImagePair(const string& leftImgPath, const string& rightImgPath);
 		
 		// methods
-		Image computeDisparity(void);
+		pair<Image,Image> computeDisparity(void);
 
 };

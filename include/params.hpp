@@ -23,6 +23,7 @@ struct Params {
 	int MIN_D;
 	int MAX_D;
 	unsigned ITERATIONS;
+	double MAX_SLOPE;              // Max slope of the window
 
 	// Flag parameters
 	bool NORMALIZE_GRADIENTS;      // With this false, TAU_GRAD must also change

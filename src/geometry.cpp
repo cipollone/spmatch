@@ -2,6 +2,7 @@
 #include "geometry.hpp"
 #include "utils.hpp"
 
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <random>
 
@@ -171,7 +172,7 @@ Vector3d Plane::randomNormal(void) const {
 
 // > class PlaneFunction
 
-const double PlaneFunction::Z_EPS = 0.5; // NOTE: max 60° planes
+const double PlaneFunction::Z_EPS = 0.01; 
 
 
 /***************************************************************************
@@ -229,8 +230,8 @@ PlaneFunction& PlaneFunction::setPlane(const Vector3d& abc, double d) {
 * (distance with sign).                                                     *
 *                                                                           *
 * Args:                                                                     *
-*   double (d1): minimum distance (with sign)                               *
-*   double (d2): maximum distance (with sign)                               *
+*   d1 (double): minimum distance (with sign)                               *
+*   d2 (double): maximum distance (with sign)                               *
 *                                                                           *
 * Returns:                                                                  *
 *   (Plane&): reference to this                                             *
@@ -252,43 +253,56 @@ PlaneFunction& PlaneFunction::setRandomPlane(double d1, double d2) {
 }
 
 
-/****************************************************************************
-* > setRandomFunction()                                                     *
-* Sets the current function to be random in a range with uniform            *
-* distribution.  The range is the set of allowed values at the given point. *
-*                                                                           *
-* Args:                                                                     *
-*   double (x): point x coord                                               *
-*   double (y): point y coord                                               *
-*   double (min): min output value at (x,y)                                 *
-*   double (max): max output value at (x,y)                                 *
-*                                                                           *
-* Returns:                                                                  *
-*   (PlaneFunction&): reference to this                                     *
-****************************************************************************/
+/***************************************************************************
+* > setRandomFunction()                                                    *
+* Sets the current function to be random in a range with uniform           *
+* distribution. The range is the set of allowed values at the given point, *
+* and the set of allowed angle of the plane with respect to the horizontal *
+* plane.                                                                   *
+*                                                                          *
+* Args:                                                                    *
+*   x (double): point x coord                                              *
+*   y (double): point y coord                                              *
+*   min (double): min output value at (x,y)                                *
+*   max (double): max output value at (x,y)                                *
+*   minAngle (double): the minimul slope. Expressed in degrees, in [0,90). *
+*   maxAngle (double): the maximum slope. Expressed in degrees, in (0,90]. *
+*                                                                          *
+* Returns:                                                                 *
+*   (PlaneFunction&): reference to this                                    *
+***************************************************************************/
 PlaneFunction& PlaneFunction::setRandomFunction(double x, double y,
-		double min, double max) {
+		double min, double max, double minAngle, double maxAngle) {
+
+	// Check
+	if (maxAngle > 90 || maxAngle <= 0) {
+		throw std::runtime_error(std::to_string(maxAngle) + " is not a valid " + 
+				"maximum plane angle for setRandomFunction()");
+	}
 	
 	// Sampling in the point--normal representation
 	
 	// point
-	std::uniform_real_distribution<double> uniform(min, max);
+	std::uniform_real_distribution<double> uniformZVal(min, max);
 	auto& rand = RandomDevice::getGenerator();
-	double zValue = uniform(rand.engine);
+	double zValue = uniformZVal(rand.engine);
 
 	// normal
-	// Generate a non-vertical plane
-	//	NOTE: assuming Z_EPS is small (Z_EPS >= 1 cause an infinite loop)
-	Vector3d n;
-	do {
-		n = randomNormal();
-	} while (!areFunctionParams(n));
+	double minZ = std::cos(maxAngle/180*M_PI);
+	double maxZ = std::cos(minAngle/180*M_PI);
+	std::uniform_real_distribution<double> uniform01;
+	std::uniform_real_distribution<double> uniformZNorm(minZ, maxZ);
+	double nZ = uniformZNorm(rand.engine); // uniform z component
+	double phi = 2*M_PI* uniform01(rand.engine) - M_PI;
+			// ^ uniform angle in [-pi,pi] in the x,y plane
+	double nX = std::cos(phi) * std::sqrt(1 - nZ*nZ); // map to uniform x
+	double nY = std::sin(phi) * std::sqrt(1 - nZ*nZ); // map to uniform y
 
-	fromPointAndNorm({x,y,zValue},n);
+	// Set
+	fromPointAndNorm({x,y,zValue}, {nX,nY,nZ});
 
 	return *this;
 }
-
 
 
 /*******************************************************************
