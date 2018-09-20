@@ -243,28 +243,28 @@ std::istream& operator>>(std::istream& in, Params::OutOfBounds& selection) {
 
 void debugging(void) {
 
-	// Testing setNeighbourFunction() . Tested!
+	// Testing setNeighbourFunctionZ()
 	PlaneFunction p1, p2;
 	int n = 10000;
 
 	cout << "#" << endl;
 	p1 = PlaneFunction().fromPointAndNorm({3,4,10}, {0,0,1});
 	for (int i = 0; i < n; ++i) {
-		p2.setNeighbourFunction(3,4, 0.2,30, p1);
+		p2.setNeighbourFunctionZ(3,4, 9,11, 30, p1);
 		cout << p2 << "          " << static_cast<Plane>(p2) << endl;
 	}
 
 	cout << "#" << endl;
 	p1 = PlaneFunction().fromPointAndNorm({3,4,10}, {1,1,1});
 	for (int i = 0; i < n; ++i) {
-		p2.setNeighbourFunction(1,1, 0.4,30, p1);
+		p2.setNeighbourFunctionZ(3,4, 11,11.5, 30, p1);
 		cout << p2 << "          " << static_cast<Plane>(p2) << endl;
 	}
 
 	cout << "#" << endl;
 	p1 = PlaneFunction().fromPointAndNorm({3,4,10}, {-1,1,0.3});
 	for (int i = 0; i < n; ++i) {
-		p2.setNeighbourFunction(1,1, 0.4,30, p1);
+		p2.setNeighbourFunction(3,4, 0.4,30, p1);
 		cout << p2 << "          " << static_cast<Plane>(p2) << endl;
 	}
 }

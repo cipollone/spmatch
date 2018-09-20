@@ -79,6 +79,8 @@ class PlaneFunction: public Plane {
 				double min, double max, double minAngle, double maxAngle);
 		PlaneFunction& setNeighbourFunction(double x, double y,
 				double deltaZ, double deltaAng, const PlaneFunction& oldFunction);
+		PlaneFunction& setNeighbourFunctionZ(double x, double y, double minZ,
+				double maxZ, double deltaAng, const PlaneFunction& oldFunction);
 		PlaneFunction& fromPointAndNorm(const Vector3d& point,
 				const Vector3d& norm) override;
 		

@@ -498,10 +498,11 @@ bool StereoImage::pixelViewPropagation(size_t w, size_t h) {
 
 /******************************************************************************
 * > planeRefinement()                                                         *
-* This method tests new random planes for pixel (w,h). Initially the plane    *
+* This method tries new random planes for pixel (w,h). Initially the plane    *
 * may be far from the original one, but in the next iterations the            *
 * modifications become smaller and smaller. At each step, a plane is accepted *
 * only if the new one has a lower cost than the previous one.                 *
+* NOTE: bounds for (w,h) are not checked.                                     *
 *                                                                             *
 * Args:                                                                       *
 *   w (size_t), h (size_t): coordinates of the plane to refine                *
@@ -510,8 +511,13 @@ bool StereoImage::pixelViewPropagation(size_t w, size_t h) {
 *   (bool): true if the plane has changed                                     *
 ******************************************************************************/
 bool StereoImage::planeRefinement(size_t w, size_t h) {
-	// TODO
-	return false;
+	
+	bool modified = false;
+	
+	// Set the initial max displacements
+	
+	
+	return modified;
 }
 
 

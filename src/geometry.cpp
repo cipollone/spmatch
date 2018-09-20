@@ -332,10 +332,42 @@ PlaneFunction& PlaneFunction::setRandomFunction(double x, double y,
 PlaneFunction& PlaneFunction::setNeighbourFunction(double x, double y,
 		double deltaZ, double deltaAng, const PlaneFunction& oldFunction) {
 
+	Vector3d oldPoint = {x, y, oldFunction(x, y)};
+	double oldZ = oldPoint(2);
+
+	return setNeighbourFunctionZ(x, y, oldZ - deltaZ, oldZ + deltaZ,
+			deltaAng, oldFunction);
+}
+
+
+/*****************************************************************************
+* > setNeighbourFunction()                                                   *
+* Sets the current plane to be a random function in a neighbourhood of the   *
+* given one. "In a neighbourhood" means that the normal is uniformly sampled *
+* in a circular region on the unit sphere around the previous normal.        *
+* The Z value instead is choosen in the range [zMin, zMax].                  *
+* The previous values are given by oldFunction.                              *
+*                                                                            *
+* Args:                                                                      *
+*   x (double): first coordinate of a point                                  *
+*   y (double): second coordinate of a point                                 *
+*   minZ (double): minimum z-value at (x,y)                                  *
+*   maxZ (double): maximum z-value at (x,y)                                  *
+*   deltaAng (double): max angle between the new normal and the old one,     *
+*       in (0,90). The angle of the circular region.                         *
+*   oldFunction (PlaneFunction): distances are referred to this function     *
+*                                                                            *
+* Returns:                                                                   *
+*   (PlaneFunction&): reference to this                                      *
+*****************************************************************************/
+PlaneFunction& PlaneFunction::setNeighbourFunctionZ(double x, double y,
+		double minZ, double maxZ, double deltaAng,
+		const PlaneFunction& oldFunction) {
+
 	// checks
-	if (deltaZ <= 0) {
-		throw std::runtime_error(
-				"deltaZ parameter of setNeighbourFunction() must be positive.");
+	if (maxZ <= minZ) {
+		throw std::runtime_error("[ " + std::to_string(minZ) +
+				", " + std::to_string(maxZ) + "] is not a valid Z range");
 	}
 	if (deltaAng <= 0 || deltaAng >= 90) {
 		throw std::runtime_error(string() +
@@ -346,7 +378,6 @@ PlaneFunction& PlaneFunction::setNeighbourFunction(double x, double y,
 	// Get the representation of the old plane at (x,y)
 	Vector3d oldNormal = oldFunction.abc;
 	Vector3d oldPoint = {x, y, oldFunction(x, y)};
-	double oldZ = oldPoint(2);
 
 	// Get the spherical coordinates of oldNormal
 	double oldTheta = std::acos(oldNormal(2));
@@ -357,7 +388,7 @@ PlaneFunction& PlaneFunction::setNeighbourFunction(double x, double y,
 	do {  // Rarely repeats (with Z_EPS small enough)
 
 		// Sampling as if in the oldNormal reference frame
-		setRandomFunction(x, y, oldZ - deltaZ, oldZ + deltaZ, 0, deltaAng);
+		setRandomFunction(x, y, minZ, maxZ, 0, deltaAng);
 		sampledNormal = abc;
 		sampledZ = operator()(x, y);
 

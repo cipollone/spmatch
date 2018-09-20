@@ -60,7 +60,7 @@ class StereoImage {
 		void setRandomDisparities(void);
 		bool pixelSpatialPropagation(size_t w, size_t h, unsigned iteration);
 		bool pixelViewPropagation(size_t w, size_t h);
-		bool planeRefinement(size_t w, size_t h);
+		bool planeRefinement(size_t w, size_t h); // TODO
 };
 
 
