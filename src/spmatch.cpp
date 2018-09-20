@@ -17,7 +17,7 @@
 #include "params.hpp"
 #include "stereo.hpp"
 
-#define DEBUG
+//#define DEBUG
 
 
 namespace po = boost::program_options;
@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
 			("output,o", po::value<string>(&outputPath)->default_value(
 				"disparity.png"), "Output file")
 			("inputs,I", po::value<std::vector<string>>(&inputImages)
-				->multitoken()->required(), "Left/right images")
+				->multitoken()->required(), "Left and right images")
 			("log,l", po::value<int>(&params.LOG), "Log level {0,...,3}")
 	;
 	paramsOpts.add_options()
@@ -159,7 +159,7 @@ void setDefaults(void) {
 	params.WINDOW_SIZE = 15;      // NOTE: Must be an odd number
 	params.MIN_D = 0;
 	params.MAX_D = 70;            // NOTE: must be positive
-	params.ITERATIONS = 1;        // TODO was 3
+	params.ITERATIONS = 3;
 	params.MAX_SLOPE = 45;
 
 	// Flag parameters

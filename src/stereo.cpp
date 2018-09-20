@@ -450,9 +450,9 @@ bool StereoImage::pixelSpatialPropagation(size_t w, size_t h,
 * View propagation step for a single pixel. It checks whether some pixels in *
 * the other view have the current pixel p as a matching point. If any of     *
 * those pixels' planes have lower cost with p, that plane is assigned to p.  *
-* NOTE: the cost is proportional in the number of pixels                     *
+* NOTE: the cost is proportional to the image width                          *
 * NOTE: the plane of the other view is not transformed into this view        *
-* NOTE: bounds are not checked                                               *
+* NOTE: bounds for (w,h) are not checked                                     *
 *                                                                            *
 * Args:                                                                      *
 *   w (size_t), h (size_t): coordinates of the pixel to check                *
@@ -469,25 +469,29 @@ bool StereoImage::pixelViewPropagation(size_t w, size_t h) {
 
 	bool modified = false;
 
-	// Scan the other image
+	// Scan the horizontal (epipolar) line
 	for (size_t oW = 0; oW < width; ++oW) {
-		for (size_t oH = 0; oH < height; ++oH) {
 
-			// Find a plane that matches the current pixel
-			auto&& otherPlane = other->disparityPlanes.get(oW, oH);
-			int oDisparity = std::lround(otherPlane(oW, oH));
-			int sign = (other->side == Side::LEFT) ? -1 : +1;
-			size_t oDispW = oW + sign * oDisparity;
+		// Other plane disparity
+		auto&& otherPlane = other->disparityPlanes.get(oW, h);
+		int oDisparity = std::lround(otherPlane(oW, h));
+		
+		if (params.PLANES_SATURATION) { // Plane saturation on/off
+			if (oDisparity > params.MAX_D) oDisparity = params.MAX_D;
+			if (oDisparity < params.MIN_D) oDisparity = params.MIN_D;
+		}
 
-			if (oDispW == w) {
+		// Find a plane that matches the current pixel
+		int sign = (other->side == Side::LEFT) ? -1 : +1;
+		size_t oDispW = oW + sign * oDisparity;
+		if (oDispW == w) {
 
-				// Test plane
-				double otherCost = pixelWindowCost(w, h, otherPlane);
-				double thisCost = pixelWindowCost(w, h, disparityPlanes.get(w, h));
-				if (otherCost < thisCost) {
-					disparityPlanes(w, h) = otherPlane;
-					modified = true;
-				}
+			// Test plane
+			double otherCost = pixelWindowCost(w, h, otherPlane);
+			double thisCost = pixelWindowCost(w, h, disparityPlanes.get(w, h));
+			if (otherCost < thisCost) {
+				disparityPlanes(w, h) = otherPlane;
+				modified = true;
 			}
 		}
 	}
@@ -528,8 +532,12 @@ bool StereoImage::planeRefinement(size_t w, size_t h) {
 	// Try different planes. Stop with a threshold
 	while (deltaZ > 0.1) {
 
-		// Compute the range for Z
+		// Get current value
 		double z = plane(w, h);
+		if (z > params.MAX_D) { z = params.MAX_D; }		   // due to propagation,
+		else if (z < params.MIN_D) { z = params.MIN_D; } // disparity might exceed
+
+		// Compute the range for Z
 		double maxZ = z + deltaZ;
 		double minZ = z - deltaZ;
 		if (maxZ > params.MAX_D) { maxZ = params.MAX_D; }
@@ -549,7 +557,7 @@ bool StereoImage::planeRefinement(size_t w, size_t h) {
 		}
 		double sampledCost = pixelWindowCost(w, h, sampledPlane);
 		if (sampledCost < thisCost) {
-			disparityPlanes(w, h) = sampledPlane;
+			plane = sampledPlane;
 			modified = true;
 			recomputeThisCost = true;
 		}
@@ -637,11 +645,10 @@ pair<Image,Image> StereoImagePair::computeDisparity(void) {
 					image->pixelSpatialPropagation(w, h, i);
 
 					// View propagation
-					//image->pixelViewPropagation(w, h);TODO: more efficient
-
-					// NOTE: No temporal propagation for images
+					image->pixelViewPropagation(w, h);
 					
-					// Plane refinement TODO
+					// Plane refinement
+					image->planeRefinement(w, h);
 
 					if (w == wLast) break;
 				}
