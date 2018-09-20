@@ -77,6 +77,8 @@ class PlaneFunction: public Plane {
 		PlaneFunction& setRandomPlane(double d1, double d2) override;
 		PlaneFunction& setRandomFunction(double x, double y,
 				double min, double max, double minAngle, double maxAngle);
+		PlaneFunction& setNeighbourFunction(double x, double y,
+				double deltaZ, double deltaAng, const PlaneFunction& oldFunction);
 		PlaneFunction& fromPointAndNorm(const Vector3d& point,
 				const Vector3d& norm) override;
 		

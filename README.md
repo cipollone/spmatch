@@ -18,8 +18,9 @@ the same API is fine.
 
 ## Usage:
 Run:
-
-	spmatch <left-image>.<ext> <right-image>.<ext>
-
-The result is a new image, <left-image>\_disp.<ext>, with the computed
-disparity.
+```
+	spmatch <left-image> <right-image>
+```
+The left and right images must be RGB images.  The result is a new image,
+"disparity.png", with the computed disparity. Run `spmatch --help` for a
+list of all available options.

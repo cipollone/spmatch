@@ -17,7 +17,7 @@
 #include "params.hpp"
 #include "stereo.hpp"
 
-//#define DEBUG
+#define DEBUG
 
 
 namespace po = boost::program_options;
@@ -243,32 +243,28 @@ std::istream& operator>>(std::istream& in, Params::OutOfBounds& selection) {
 
 void debugging(void) {
 
-	// Testing random function generation
-	cout << "Testing new random functions" << endl;
-	PlaneFunction p;
-	int n = 50000;
+	// Testing setNeighbourFunction() . Tested!
+	PlaneFunction p1, p2;
+	int n = 10000;
 
-	cout << "Test 1. [0,89]" << endl;
+	cout << "#" << endl;
+	p1 = PlaneFunction().fromPointAndNorm({3,4,10}, {0,0,1});
 	for (int i = 0; i < n; ++i) {
-		p.setRandomFunction(3,5, 0,10, 0,89);
-		cout << static_cast<Plane>(p) << endl;
+		p2.setNeighbourFunction(3,4, 0.2,30, p1);
+		cout << p2 << "          " << static_cast<Plane>(p2) << endl;
 	}
 
-	cout << "Test 2. [0,60]" << endl;
+	cout << "#" << endl;
+	p1 = PlaneFunction().fromPointAndNorm({3,4,10}, {1,1,1});
 	for (int i = 0; i < n; ++i) {
-		p.setRandomFunction(3,5, 0,10, 0,60);
-		cout << static_cast<Plane>(p) << endl;
+		p2.setNeighbourFunction(1,1, 0.4,30, p1);
+		cout << p2 << "          " << static_cast<Plane>(p2) << endl;
 	}
 
-	cout << "Test 3. [0,30]" << endl;
+	cout << "#" << endl;
+	p1 = PlaneFunction().fromPointAndNorm({3,4,10}, {-1,1,0.3});
 	for (int i = 0; i < n; ++i) {
-		p.setRandomFunction(3,5, 0,10, 0,30);
-		cout << static_cast<Plane>(p) << endl;
-	}
-
-	cout << "Test 4. [30,45]" << endl;
-	for (int i = 0; i < n; ++i) {
-		p.setRandomFunction(3,5, 0,10, 30,45);
-		cout << static_cast<Plane>(p) << endl;
+		p2.setNeighbourFunction(1,1, 0.4,30, p1);
+		cout << p2 << "          " << static_cast<Plane>(p2) << endl;
 	}
 }

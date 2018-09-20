@@ -5,6 +5,10 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <random>
+#include <Eigen/Geometry>
+
+using Eigen::Matrix3d;
+using Eigen::AngleAxisd;
 
 
 // > class Plane
@@ -300,6 +304,73 @@ PlaneFunction& PlaneFunction::setRandomFunction(double x, double y,
 
 	// Set
 	fromPointAndNorm({x,y,zValue}, {nX,nY,nZ});
+
+	return *this;
+}
+
+
+/***************************************************************************
+* > setNeighbourFunction()                                                 *
+* Sets the current plane to be a random function in a neighbourhood of the *
+* given one. "In a neighbourhood" means that: its value at point           *
+* (x,y) will be at most 'deltaZ' far from the previous value; the normal   *
+* will be within in a circular region on the unit sphere, around the       *
+* previous normal. Both are sampled with uniform distribution.             *
+* The previous values are given by oldFunction.                            *
+*                                                                          *
+* Args:                                                                    *
+*   x (double): first coordinate of a point                                *
+*   y (double): second coordinate of a point                               *
+*   deltaZ (double): max abs difference of the new z-value at (x,y)        *
+*   deltaAng (double): max angle between the new normal and the old one,   *
+*       in (0,90). The angle of the circular region.                       *
+*   oldFunction (PlaneFunction): distances are referred to this function   *
+*                                                                          *
+* Returns:                                                                 *
+*   (PlaneFunction&): reference to this                                    *
+***************************************************************************/
+PlaneFunction& PlaneFunction::setNeighbourFunction(double x, double y,
+		double deltaZ, double deltaAng, const PlaneFunction& oldFunction) {
+
+	// checks
+	if (deltaZ <= 0) {
+		throw std::runtime_error(
+				"deltaZ parameter of setNeighbourFunction() must be positive.");
+	}
+	if (deltaAng <= 0 || deltaAng >= 90) {
+		throw std::runtime_error(string() +
+				"deltaT parameter of setNeighbourFunction() " +
+				"must be in the range (0,90).");
+	}
+
+	// Get the representation of the old plane at (x,y)
+	Vector3d oldNormal = oldFunction.abc;
+	Vector3d oldPoint = {x, y, oldFunction(x, y)};
+	double oldZ = oldPoint(2);
+
+	// Get the spherical coordinates of oldNormal
+	double oldTheta = std::acos(oldNormal(2));
+	double oldPhi = std::atan2(oldNormal(1), oldNormal(0));
+
+	Vector3d sampledNormal;
+	double sampledZ;
+	do {  // Rarely repeats (with Z_EPS small enough)
+
+		// Sampling as if in the oldNormal reference frame
+		setRandomFunction(x, y, oldZ - deltaZ, oldZ + deltaZ, 0, deltaAng);
+		sampledNormal = abc;
+		sampledZ = operator()(x, y);
+
+		// Rotating in the global frame:  Rz(phi) * Ry(theta)
+		Matrix3d rot;
+		rot = AngleAxisd(oldPhi, Vector3d::UnitZ()) *
+				AngleAxisd(oldTheta, Vector3d::UnitY());
+		sampledNormal = rot * sampledNormal;
+
+	} while (!areFunctionParams(sampledNormal));  
+
+	// Set
+	fromPointAndNorm({x, y, sampledZ}, sampledNormal);
 
 	return *this;
 }
