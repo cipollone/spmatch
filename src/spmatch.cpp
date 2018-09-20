@@ -243,28 +243,25 @@ std::istream& operator>>(std::istream& in, Params::OutOfBounds& selection) {
 
 void debugging(void) {
 
-	// Testing setNeighbourFunctionZ()
-	PlaneFunction p1, p2;
-	int n = 10000;
+	// Testing planeRefinement()
+	StereoImage sL("tests/cones-small/im2.png", StereoImage::LEFT);
+	StereoImage sR("tests/cones-small/im6.png", StereoImage::RIGHT);
+	sL.bind(&sR);
+	sL.setRandomDisparities();
+	auto dim = sL.size();
 
-	cout << "#" << endl;
-	p1 = PlaneFunction().fromPointAndNorm({3,4,10}, {0,0,1});
-	for (int i = 0; i < n; ++i) {
-		p2.setNeighbourFunctionZ(3,4, 9,11, 30, p1);
-		cout << p2 << "          " << static_cast<Plane>(p2) << endl;
+	for (unsigned i = 0; i < params.ITERATIONS; ++i) {
+		cout << "Iteration " << i << endl;
+		for (size_t w = 0; w < dim.first; ++w) {
+			for (size_t h = 0; h < dim.second; ++h) {
+				sL.planeRefinement(w, h);
+			}
+			cout << w << " " << endl;
+		}
 	}
 
-	cout << "#" << endl;
-	p1 = PlaneFunction().fromPointAndNorm({3,4,10}, {1,1,1});
-	for (int i = 0; i < n; ++i) {
-		p2.setNeighbourFunctionZ(3,4, 11,11.5, 30, p1);
-		cout << p2 << "          " << static_cast<Plane>(p2) << endl;
-	}
-
-	cout << "#" << endl;
-	p1 = PlaneFunction().fromPointAndNorm({3,4,10}, {-1,1,0.3});
-	for (int i = 0; i < n; ++i) {
-		p2.setNeighbourFunction(3,4, 0.4,30, p1);
-		cout << p2 << "          " << static_cast<Plane>(p2) << endl;
-	}
+	Image disparity = sL.getDisparityMap();
+	disparity.display();
+	disparity.setPath("test.png");
+	disparity.write();
 }

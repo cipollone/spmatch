@@ -71,16 +71,16 @@ class PlaneFunction: public Plane {
 
 		// const methods
 		Vector3d getFunParams(void) const;
+		PlaneFunction getNeighbourFunction(double x, double y,
+				double deltaZ, double deltaAng) const;
+		PlaneFunction getNeighbourFunction(double x, double y,
+				double minZ, double maxZ, double deltaAng) const;
 
 		// other methods
 		PlaneFunction& setPlane(const Vector3d& abc, double d) override;
 		PlaneFunction& setRandomPlane(double d1, double d2) override;
 		PlaneFunction& setRandomFunction(double x, double y,
 				double min, double max, double minAngle, double maxAngle);
-		PlaneFunction& setNeighbourFunction(double x, double y,
-				double deltaZ, double deltaAng, const PlaneFunction& oldFunction);
-		PlaneFunction& setNeighbourFunctionZ(double x, double y, double minZ,
-				double maxZ, double deltaAng, const PlaneFunction& oldFunction);
 		PlaneFunction& fromPointAndNorm(const Vector3d& point,
 				const Vector3d& norm) override;
 		
@@ -89,6 +89,6 @@ class PlaneFunction: public Plane {
 		friend std::ostream& operator<<(std::ostream& out, const PlaneFunction& p);
 
 		// static
-		inline bool areFunctionParams(Vector3d p);
+		inline bool areFunctionParams(Vector3d p) const;
 
 };

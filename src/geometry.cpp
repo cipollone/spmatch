@@ -309,60 +309,55 @@ PlaneFunction& PlaneFunction::setRandomFunction(double x, double y,
 }
 
 
-/***************************************************************************
-* > setNeighbourFunction()                                                 *
-* Sets the current plane to be a random function in a neighbourhood of the *
-* given one. "In a neighbourhood" means that: its value at point           *
-* (x,y) will be at most 'deltaZ' far from the previous value; the normal   *
-* will be within in a circular region on the unit sphere, around the       *
-* previous normal. Both are sampled with uniform distribution.             *
-* The previous values are given by oldFunction.                            *
-*                                                                          *
-* Args:                                                                    *
-*   x (double): first coordinate of a point                                *
-*   y (double): second coordinate of a point                               *
-*   deltaZ (double): max abs difference of the new z-value at (x,y)        *
-*   deltaAng (double): max angle between the new normal and the old one,   *
-*       in (0,90). The angle of the circular region.                       *
-*   oldFunction (PlaneFunction): distances are referred to this function   *
-*                                                                          *
-* Returns:                                                                 *
-*   (PlaneFunction&): reference to this                                    *
-***************************************************************************/
-PlaneFunction& PlaneFunction::setNeighbourFunction(double x, double y,
-		double deltaZ, double deltaAng, const PlaneFunction& oldFunction) {
+/*************************************************************************
+* > setNeighbourFunction()                                               *
+* Returns a plane as a random function in a neighbourhood of the         *
+* given one. "In a neighbourhood" means that: its value at point         *
+* (x,y) will be at most 'deltaZ' far from the current value; the normal  *
+* will be within in a circular region on the unit sphere, around the     *
+* current normal. Both are sampled with uniform distribution.            *
+* The current values are taken form 'this' object.                       *
+*                                                                        *
+* Args:                                                                  *
+*   x (double): first coordinate of a point                              *
+*   y (double): second coordinate of a point                             *
+*   deltaZ (double): max abs difference of the new z-value at (x,y)      *
+*   deltaAng (double): max angle between the new normal and the old one, *
+*       in (0,90). This is the angle of the circular region.             *
+*                                                                        *
+* Returns:                                                               *
+*   (PlaneFunction): The new plane                                       *
+*************************************************************************/
+PlaneFunction PlaneFunction::getNeighbourFunction(double x, double y,
+		double deltaZ, double deltaAng) const {
 
-	Vector3d oldPoint = {x, y, oldFunction(x, y)};
-	double oldZ = oldPoint(2);
+	double oldZ = operator()(x, y);
 
-	return setNeighbourFunctionZ(x, y, oldZ - deltaZ, oldZ + deltaZ,
-			deltaAng, oldFunction);
+	return getNeighbourFunction(x, y, oldZ - deltaZ, oldZ + deltaZ,
+			deltaAng);
 }
 
 
 /*****************************************************************************
-* > setNeighbourFunction()                                                   *
-* Sets the current plane to be a random function in a neighbourhood of the   *
-* given one. "In a neighbourhood" means that the normal is uniformly sampled *
-* in a circular region on the unit sphere around the previous normal.        *
+* > getNeighbourFunction()                                                   *
+* Returns a plane as a random function in a neighbourhood of 'this'          *
+* plane. "In a neighbourhood" means that the normal is uniformly sampled     *
+* in a circular region on the unit sphere around 'this' normal.              *
 * The Z value instead is choosen in the range [zMin, zMax].                  *
-* The previous values are given by oldFunction.                              *
 *                                                                            *
 * Args:                                                                      *
 *   x (double): first coordinate of a point                                  *
 *   y (double): second coordinate of a point                                 *
 *   minZ (double): minimum z-value at (x,y)                                  *
 *   maxZ (double): maximum z-value at (x,y)                                  *
-*   deltaAng (double): max angle between the new normal and the old one,     *
-*       in (0,90). The angle of the circular region.                         *
-*   oldFunction (PlaneFunction): distances are referred to this function     *
+*   deltaAng (double): max angle between the new normal and the current one, *
+*       in (0,90). This is the angle of the circular region.                 *
 *                                                                            *
 * Returns:                                                                   *
-*   (PlaneFunction&): reference to this                                      *
+*   (PlaneFunction): the new plane                                           *
 *****************************************************************************/
-PlaneFunction& PlaneFunction::setNeighbourFunctionZ(double x, double y,
-		double minZ, double maxZ, double deltaAng,
-		const PlaneFunction& oldFunction) {
+PlaneFunction PlaneFunction::getNeighbourFunction(double x, double y,
+		double minZ, double maxZ, double deltaAng) const {
 
 	// checks
 	if (maxZ <= minZ) {
@@ -376,8 +371,8 @@ PlaneFunction& PlaneFunction::setNeighbourFunctionZ(double x, double y,
 	}
 
 	// Get the representation of the old plane at (x,y)
-	Vector3d oldNormal = oldFunction.abc;
-	Vector3d oldPoint = {x, y, oldFunction(x, y)};
+	Vector3d oldNormal = abc;
+	Vector3d oldPoint = {x, y, operator()(x, y)};
 
 	// Get the spherical coordinates of oldNormal
 	double oldTheta = std::acos(oldNormal(2));
@@ -385,12 +380,13 @@ PlaneFunction& PlaneFunction::setNeighbourFunctionZ(double x, double y,
 
 	Vector3d sampledNormal;
 	double sampledZ;
+	PlaneFunction newFun;
 	do {  // Rarely repeats (with Z_EPS small enough)
 
 		// Sampling as if in the oldNormal reference frame
-		setRandomFunction(x, y, minZ, maxZ, 0, deltaAng);
-		sampledNormal = abc;
-		sampledZ = operator()(x, y);
+		newFun.setRandomFunction(x, y, minZ, maxZ, 0, deltaAng);
+		sampledNormal = newFun.abc;
+		sampledZ = newFun(x, y);
 
 		// Rotating in the global frame:  Rz(phi) * Ry(theta)
 		Matrix3d rot;
@@ -401,9 +397,9 @@ PlaneFunction& PlaneFunction::setNeighbourFunctionZ(double x, double y,
 	} while (!areFunctionParams(sampledNormal));  
 
 	// Set
-	fromPointAndNorm({x, y, sampledZ}, sampledNormal);
+	newFun.fromPointAndNorm({x, y, sampledZ}, sampledNormal);
 
-	return *this;
+	return newFun;
 }
 
 
@@ -463,6 +459,6 @@ std::ostream& operator<<(std::ostream& out, const PlaneFunction& p) {
 * Returns:                                             *
 *   (bool): true if p is a valid normal for a function *
 *******************************************************/
-inline bool PlaneFunction::areFunctionParams(Vector3d p) {
+inline bool PlaneFunction::areFunctionParams(Vector3d p) const {
 	return std::abs(p(2)) > Z_EPS;
 }

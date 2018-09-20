@@ -503,6 +503,9 @@ bool StereoImage::pixelViewPropagation(size_t w, size_t h) {
 * modifications become smaller and smaller. At each step, a plane is accepted *
 * only if the new one has a lower cost than the previous one.                 *
 * NOTE: bounds for (w,h) are not checked.                                     *
+* Important NOTE: the cost of this operation is variable.                     *
+* The number of planes tested follows a geometric distribution                *
+* with probability ~ 0.45 in the worst case.                                  *
 *                                                                             *
 * Args:                                                                       *
 *   w (size_t), h (size_t): coordinates of the plane to refine                *
@@ -514,8 +517,47 @@ bool StereoImage::planeRefinement(size_t w, size_t h) {
 	
 	bool modified = false;
 	
-	// Set the initial max displacements
+	// Set the initial ranges. Initally, the maximum variation.
+	PlaneFunction& plane = disparityPlanes(w, h);
+	double deltaZ = (params.MAX_D - params.MIN_D) / 2;
+	double deltaAng = 89;		// < 90° in any direction
 	
+	double thisCost;
+	bool recomputeThisCost = true;  // for efficiency
+
+	// Try different planes. Stop with a threshold
+	while (deltaZ > 0.1) {
+
+		// Compute the range for Z
+		double z = plane(w, h);
+		double maxZ = z + deltaZ;
+		double minZ = z - deltaZ;
+		if (maxZ > params.MAX_D) { maxZ = params.MAX_D; }
+		if (minZ < params.MIN_D) { minZ = params.MIN_D; }
+
+		// Sample a new plane until we get a slope in the desired range
+		PlaneFunction sampledPlane;
+		do {
+			sampledPlane = plane.getNeighbourFunction(w, h, minZ, maxZ, deltaAng);
+		} while (std::abs(sampledPlane.getParams().first(2)) <
+				std::cos(params.MAX_SLOPE));
+
+		// Set if the new one has lower cost
+		if (recomputeThisCost) {
+			thisCost = pixelWindowCost(w, h, disparityPlanes.get(w, h));
+			recomputeThisCost = false;
+		}
+		double sampledCost = pixelWindowCost(w, h, sampledPlane);
+		if (sampledCost < thisCost) {
+			disparityPlanes(w, h) = sampledPlane;
+			modified = true;
+			recomputeThisCost = true;
+		}
+
+		// Half range
+		deltaZ /= 2;
+		deltaAng /= 2;
+	}
 	
 	return modified;
 }
