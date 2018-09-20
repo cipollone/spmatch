@@ -2,8 +2,13 @@
 #include "geometry.hpp"
 #include "utils.hpp"
 
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <random>
+#include <Eigen/Geometry>
+
+using Eigen::Matrix3d;
+using Eigen::AngleAxisd;
 
 
 // > class Plane
@@ -171,7 +176,7 @@ Vector3d Plane::randomNormal(void) const {
 
 // > class PlaneFunction
 
-const double PlaneFunction::Z_EPS = 0.5; // NOTE: max 60° planes
+const double PlaneFunction::Z_EPS = 0.01; 
 
 
 /***************************************************************************
@@ -229,8 +234,8 @@ PlaneFunction& PlaneFunction::setPlane(const Vector3d& abc, double d) {
 * (distance with sign).                                                     *
 *                                                                           *
 * Args:                                                                     *
-*   double (d1): minimum distance (with sign)                               *
-*   double (d2): maximum distance (with sign)                               *
+*   d1 (double): minimum distance (with sign)                               *
+*   d2 (double): maximum distance (with sign)                               *
 *                                                                           *
 * Returns:                                                                  *
 *   (Plane&): reference to this                                             *
@@ -252,43 +257,150 @@ PlaneFunction& PlaneFunction::setRandomPlane(double d1, double d2) {
 }
 
 
-/****************************************************************************
-* > setRandomFunction()                                                     *
-* Sets the current function to be random in a range with uniform            *
-* distribution.  The range is the set of allowed values at the given point. *
-*                                                                           *
-* Args:                                                                     *
-*   double (x): point x coord                                               *
-*   double (y): point y coord                                               *
-*   double (min): min output value at (x,y)                                 *
-*   double (max): max output value at (x,y)                                 *
-*                                                                           *
-* Returns:                                                                  *
-*   (PlaneFunction&): reference to this                                     *
-****************************************************************************/
+/***************************************************************************
+* > setRandomFunction()                                                    *
+* Sets the current function to be random in a range with uniform           *
+* distribution. The range is the set of allowed values at the given point, *
+* and the set of allowed angle of the plane with respect to the horizontal *
+* plane.                                                                   *
+*                                                                          *
+* Args:                                                                    *
+*   x (double): point x coord                                              *
+*   y (double): point y coord                                              *
+*   min (double): min output value at (x,y)                                *
+*   max (double): max output value at (x,y)                                *
+*   minAngle (double): the minimul slope. Expressed in degrees, in [0,90). *
+*   maxAngle (double): the maximum slope. Expressed in degrees, in (0,90]. *
+*                                                                          *
+* Returns:                                                                 *
+*   (PlaneFunction&): reference to this                                    *
+***************************************************************************/
 PlaneFunction& PlaneFunction::setRandomFunction(double x, double y,
-		double min, double max) {
+		double min, double max, double minAngle, double maxAngle) {
+
+	// Check
+	if (maxAngle > 90 || maxAngle <= 0) {
+		throw std::runtime_error(std::to_string(maxAngle) + " is not a valid " + 
+				"maximum plane angle for setRandomFunction()");
+	}
 	
 	// Sampling in the point--normal representation
 	
 	// point
-	std::uniform_real_distribution<double> uniform(min, max);
+	std::uniform_real_distribution<double> uniformZVal(min, max);
 	auto& rand = RandomDevice::getGenerator();
-	double zValue = uniform(rand.engine);
+	double zValue = uniformZVal(rand.engine);
 
 	// normal
-	// Generate a non-vertical plane
-	//	NOTE: assuming Z_EPS is small (Z_EPS >= 1 cause an infinite loop)
-	Vector3d n;
-	do {
-		n = randomNormal();
-	} while (!areFunctionParams(n));
+	double minZ = std::cos(maxAngle/180*M_PI);
+	double maxZ = std::cos(minAngle/180*M_PI);
+	std::uniform_real_distribution<double> uniform01;
+	std::uniform_real_distribution<double> uniformZNorm(minZ, maxZ);
+	double nZ = uniformZNorm(rand.engine); // uniform z component
+	double phi = 2*M_PI* uniform01(rand.engine) - M_PI;
+			// ^ uniform angle in [-pi,pi] in the x,y plane
+	double nX = std::cos(phi) * std::sqrt(1 - nZ*nZ); // map to uniform x
+	double nY = std::sin(phi) * std::sqrt(1 - nZ*nZ); // map to uniform y
 
-	fromPointAndNorm({x,y,zValue},n);
+	// Set
+	fromPointAndNorm({x,y,zValue}, {nX,nY,nZ});
 
 	return *this;
 }
 
+
+/*************************************************************************
+* > setNeighbourFunction()                                               *
+* Returns a plane as a random function in a neighbourhood of the         *
+* given one. "In a neighbourhood" means that: its value at point         *
+* (x,y) will be at most 'deltaZ' far from the current value; the normal  *
+* will be within in a circular region on the unit sphere, around the     *
+* current normal. Both are sampled with uniform distribution.            *
+* The current values are taken form 'this' object.                       *
+*                                                                        *
+* Args:                                                                  *
+*   x (double): first coordinate of a point                              *
+*   y (double): second coordinate of a point                             *
+*   deltaZ (double): max abs difference of the new z-value at (x,y)      *
+*   deltaAng (double): max angle between the new normal and the old one, *
+*       in (0,90). This is the angle of the circular region.             *
+*                                                                        *
+* Returns:                                                               *
+*   (PlaneFunction): The new plane                                       *
+*************************************************************************/
+PlaneFunction PlaneFunction::getNeighbourFunction(double x, double y,
+		double deltaZ, double deltaAng) const {
+
+	double oldZ = operator()(x, y);
+
+	return getNeighbourFunction(x, y, oldZ - deltaZ, oldZ + deltaZ,
+			deltaAng);
+}
+
+
+/*****************************************************************************
+* > getNeighbourFunction()                                                   *
+* Returns a plane as a random function in a neighbourhood of 'this'          *
+* plane. "In a neighbourhood" means that the normal is uniformly sampled     *
+* in a circular region on the unit sphere around 'this' normal.              *
+* The Z value instead is choosen in the range [zMin, zMax].                  *
+*                                                                            *
+* Args:                                                                      *
+*   x (double): first coordinate of a point                                  *
+*   y (double): second coordinate of a point                                 *
+*   minZ (double): minimum z-value at (x,y)                                  *
+*   maxZ (double): maximum z-value at (x,y)                                  *
+*   deltaAng (double): max angle between the new normal and the current one, *
+*       in (0,90). This is the angle of the circular region.                 *
+*                                                                            *
+* Returns:                                                                   *
+*   (PlaneFunction): the new plane                                           *
+*****************************************************************************/
+PlaneFunction PlaneFunction::getNeighbourFunction(double x, double y,
+		double minZ, double maxZ, double deltaAng) const {
+
+	// checks
+	if (maxZ <= minZ) {
+		throw std::runtime_error("[ " + std::to_string(minZ) +
+				", " + std::to_string(maxZ) + "] is not a valid Z range");
+	}
+	if (deltaAng <= 0 || deltaAng >= 90) {
+		throw std::runtime_error(string() +
+				"deltaT parameter of setNeighbourFunction() " +
+				"must be in the range (0,90).");
+	}
+
+	// Get the representation of the old plane at (x,y)
+	Vector3d oldNormal = abc;
+	Vector3d oldPoint = {x, y, operator()(x, y)};
+
+	// Get the spherical coordinates of oldNormal
+	double oldTheta = std::acos(oldNormal(2));
+	double oldPhi = std::atan2(oldNormal(1), oldNormal(0));
+
+	Vector3d sampledNormal;
+	double sampledZ;
+	PlaneFunction newFun;
+	do {  // Rarely repeats (with Z_EPS small enough)
+
+		// Sampling as if in the oldNormal reference frame
+		newFun.setRandomFunction(x, y, minZ, maxZ, 0, deltaAng);
+		sampledNormal = newFun.abc;
+		sampledZ = newFun(x, y);
+
+		// Rotating in the global frame:  Rz(phi) * Ry(theta)
+		Matrix3d rot;
+		rot = AngleAxisd(oldPhi, Vector3d::UnitZ()) *
+				AngleAxisd(oldTheta, Vector3d::UnitY());
+		sampledNormal = rot * sampledNormal;
+
+	} while (!areFunctionParams(sampledNormal));  
+
+	// Set
+	newFun.fromPointAndNorm({x, y, sampledZ}, sampledNormal);
+
+	return newFun;
+}
 
 
 /*******************************************************************
@@ -347,6 +459,6 @@ std::ostream& operator<<(std::ostream& out, const PlaneFunction& p) {
 * Returns:                                             *
 *   (bool): true if p is a valid normal for a function *
 *******************************************************/
-inline bool PlaneFunction::areFunctionParams(Vector3d p) {
+inline bool PlaneFunction::areFunctionParams(Vector3d p) const {
 	return std::abs(p(2)) > Z_EPS;
 }

@@ -99,9 +99,9 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 	}
 
 	// Disparity
-	double d = disparity(w, h); // NOTE: this disparity can exceed the limits
-	                            //   We will just check out of bounds, for now
-	if (params.PLANES_SATURATION) { // TODO: is it useful?
+	double d = disparity(w, h);
+
+	if (params.PLANES_SATURATION) { // Plane saturation on/off
 		if (d > params.MAX_D) d = params.MAX_D;
 		if (d < params.MIN_D) d = params.MIN_D;
 	}
@@ -282,6 +282,18 @@ double StereoImage::pixelWindowCost(size_t w, size_t h,
 	// Normalizing the cost
 	double total = totalCost / nPixels;
 
+	// Check Nan cost due to borders
+	if (nPixels == 0) {
+		if ((side == LEFT && w > (unsigned)params.MAX_D) ||		// positive MAX_D
+				(side == RIGHT && w < (width - params.MAX_D))) {
+			throw std::logic_error("The window of pixel (" + to_string(w) + ", " +
+					to_string(h) + ") shouldn't fall completely outside\n" +
+					"Plane: " + sStr(disparityPlanes.get(w, h)));
+		} else {
+			return 200; // NOTE: pixel on the border: can't compute disparity
+		}
+	}
+	
 	return total;
 }
 
@@ -301,11 +313,9 @@ Image StereoImage::getDisparityMap(void) const {
 
 			double d = disparityAt(w, h);
 
-			// Saturation TODO: why correct values saturate if the max should be 50?
-			/*
+			// Saturation
 			if (d > params.MAX_D) d = params.MAX_D;
 			if (d < params.MIN_D) d = params.MIN_D;
-			*/
 			disp(w, h) = d;
 		}
 	}
@@ -355,18 +365,24 @@ void StereoImage::unbind(void) {
 }
 
 
-/**********************************************************************
-* > setRandomDisparities()                                            *
-* Set all 'disparityPlanes' to random linear functions. The range of  *
-* disparity values in the central pixel of each plane is given by the *
-* parameters [params.MIN_D, params.MAX_D]                             *
-**********************************************************************/
+/************************************************************************
+* > setRandomDisparities()                                              *
+* Set all 'disparityPlanes' to random linear functions. The range of    *
+* disparity values in the central pixel of each plane is given by the   *
+* parameters [params.MIN_D, params.MAX_D]. The angle of the plane is at *
+* most params.MAX_SLOPE.                                                *
+************************************************************************/
 void StereoImage::setRandomDisparities(void) {
 
 	for (size_t w = 0; w < width; ++w) {
 		for (size_t h = 0; h < height; ++h) {
 			disparityPlanes(w, h).setRandomFunction(w, h,
-					params.MIN_D, params.MAX_D);
+					params.MIN_D, params.MAX_D, 0, params.MAX_SLOPE);
+
+			// Force planar windows if requested
+			if (params.CONST_DISPARITIES) {
+				disparityPlanes(w, h).setPlane({0,0,-1}, disparityPlanes(w, h)(w, h));
+			}
 		}
 	}
 }
@@ -424,8 +440,6 @@ bool StereoImage::pixelSpatialPropagation(size_t w, size_t h,
 			modified = true;
 		}
 	}
-	logMsg("cost " + to_string(thisCost) + ", newCost " + 
-			to_string(disparityPlanes(w,h)(w,h)), 3, ' ');
 
 	return modified;
 }
@@ -436,9 +450,9 @@ bool StereoImage::pixelSpatialPropagation(size_t w, size_t h,
 * View propagation step for a single pixel. It checks whether some pixels in *
 * the other view have the current pixel p as a matching point. If any of     *
 * those pixels' planes have lower cost with p, that plane is assigned to p.  *
-* NOTE: the cost is proportional in the number of pixels                     *
+* NOTE: the cost is proportional to the image width                          *
 * NOTE: the plane of the other view is not transformed into this view        *
-* NOTE: bounds are not checked                                               *
+* NOTE: bounds for (w,h) are not checked                                     *
 *                                                                            *
 * Args:                                                                      *
 *   w (size_t), h (size_t): coordinates of the pixel to check                *
@@ -455,29 +469,104 @@ bool StereoImage::pixelViewPropagation(size_t w, size_t h) {
 
 	bool modified = false;
 
-	// Scan the other image
+	// Scan the horizontal (epipolar) line
 	for (size_t oW = 0; oW < width; ++oW) {
-		for (size_t oH = 0; oH < height; ++oH) {
 
-			// Find a plane that matches the current pixel
-			auto&& otherPlane = other->disparityPlanes.get(oW, oH);
-			int oDisparity = std::lround(otherPlane(oW, oH));
-			int sign = (other->side == Side::LEFT) ? -1 : +1;
-			size_t oDispW = oW + sign * oDisparity;
+		// Other plane disparity
+		auto&& otherPlane = other->disparityPlanes.get(oW, h);
+		int oDisparity = std::lround(otherPlane(oW, h));
+		
+		if (params.PLANES_SATURATION) { // Plane saturation on/off
+			if (oDisparity > params.MAX_D) oDisparity = params.MAX_D;
+			if (oDisparity < params.MIN_D) oDisparity = params.MIN_D;
+		}
 
-			if (oDispW == w) {
+		// Find a plane that matches the current pixel
+		int sign = (other->side == Side::LEFT) ? -1 : +1;
+		size_t oDispW = oW + sign * oDisparity;
+		if (oDispW == w) {
 
-				// Test plane
-				double otherCost = pixelWindowCost(w, h, otherPlane);
-				double thisCost = pixelWindowCost(w, h, disparityPlanes.get(w, h));
-				if (otherCost < thisCost) {
-					disparityPlanes(w, h) = otherPlane;
-					modified = true;
-				}
+			// Test plane
+			double otherCost = pixelWindowCost(w, h, otherPlane);
+			double thisCost = pixelWindowCost(w, h, disparityPlanes.get(w, h));
+			if (otherCost < thisCost) {
+				disparityPlanes(w, h) = otherPlane;
+				modified = true;
 			}
 		}
 	}
 
+	return modified;
+}
+
+
+/******************************************************************************
+* > planeRefinement()                                                         *
+* This method tries new random planes for pixel (w,h). Initially the plane    *
+* may be far from the original one, but in the next iterations the            *
+* modifications become smaller and smaller. At each step, a plane is accepted *
+* only if the new one has a lower cost than the previous one.                 *
+* NOTE: bounds for (w,h) are not checked.                                     *
+* Important NOTE: the cost of this operation is variable.                     *
+* The number of planes tested follows a geometric distribution                *
+* with probability ~ 0.45 in the worst case.                                  *
+*                                                                             *
+* Args:                                                                       *
+*   w (size_t), h (size_t): coordinates of the plane to refine                *
+*                                                                             *
+* Returns:                                                                    *
+*   (bool): true if the plane has changed                                     *
+******************************************************************************/
+bool StereoImage::planeRefinement(size_t w, size_t h) {
+	
+	bool modified = false;
+	
+	// Set the initial ranges. Initally, the maximum variation.
+	PlaneFunction& plane = disparityPlanes(w, h);
+	double deltaZ = (params.MAX_D - params.MIN_D) / 2;
+	double deltaAng = 89;		// < 90° in any direction
+	
+	double thisCost;
+	bool recomputeThisCost = true;  // for efficiency
+
+	// Try different planes. Stop with a threshold
+	while (deltaZ > 0.1) {
+
+		// Get current value
+		double z = plane(w, h);
+		if (z > params.MAX_D) { z = params.MAX_D; }		   // due to propagation,
+		else if (z < params.MIN_D) { z = params.MIN_D; } // disparity might exceed
+
+		// Compute the range for Z
+		double maxZ = z + deltaZ;
+		double minZ = z - deltaZ;
+		if (maxZ > params.MAX_D) { maxZ = params.MAX_D; }
+		if (minZ < params.MIN_D) { minZ = params.MIN_D; }
+
+		// Sample a new plane until we get a slope in the desired range
+		PlaneFunction sampledPlane;
+		do {
+			sampledPlane = plane.getNeighbourFunction(w, h, minZ, maxZ, deltaAng);
+		} while (std::abs(sampledPlane.getParams().first(2)) <
+				std::cos(params.MAX_SLOPE));
+
+		// Set if the new one has lower cost
+		if (recomputeThisCost) {
+			thisCost = pixelWindowCost(w, h, disparityPlanes.get(w, h));
+			recomputeThisCost = false;
+		}
+		double sampledCost = pixelWindowCost(w, h, sampledPlane);
+		if (sampledCost < thisCost) {
+			plane = sampledPlane;
+			modified = true;
+			recomputeThisCost = true;
+		}
+
+		// Half range
+		deltaZ /= 2;
+		deltaAng /= 2;
+	}
+	
 	return modified;
 }
 
@@ -510,9 +599,9 @@ StereoImagePair::StereoImagePair(const string& leftImgPath,
 * reference paper for more.                                             *
 *                                                                       *
 * Returns:                                                              *
-*   (Image): the disparity map of the left view                         *
+*   (pair<Image,Image>): the left and right disparity maps              *
 ************************************************************************/
-Image StereoImagePair::computeDisparity(void) {
+pair<Image,Image> StereoImagePair::computeDisparity(void) {
 
 	// Random Initialization
 	leftImg.setRandomDisparities();
@@ -521,6 +610,7 @@ Image StereoImagePair::computeDisparity(void) {
 
 	// For each iteration
 	for (unsigned i = 0; i < params.ITERATIONS; ++i) {
+		logMsg("Iteration #"+to_string(i+1), 1);
 
 		// Select the direction
 		int increment = (i % 2 == 0) ? 1 : -1;
@@ -539,7 +629,9 @@ Image StereoImagePair::computeDisparity(void) {
 
 		// For each of the two images
 		auto image = &leftImg;
-		for (unsigned v = 0; v < 1; ++v, image = &rightImg) { // TODO: 2 images
+		for (unsigned v = 0; v < 2; ++v, image = &rightImg) {
+			logMsg(string("Processing the ") +
+					((image == &leftImg) ? "left " : "right ") + "image" , 1);
 
 			// For each pixel: row major order.
 			//		NOTE: whole image, not ignoring lateral bands
@@ -551,36 +643,24 @@ Image StereoImagePair::computeDisparity(void) {
 
 					// Spatial propagation
 					image->pixelSpatialPropagation(w, h, i);
-					logMsg("pixelSpatialPropagation();", 3, ' ');
 
 					// View propagation
-					//image->pixelViewPropagation(w, h);
-					////logMsg("pixelViewPropagation();", 3, ' '); TODO: more efficient
-
-					// NOTE: No temporal propagation for images
+					image->pixelViewPropagation(w, h);
 					
-					// Plane refinement TODO
-
-					logMsg("", 3, '\n');
-
-					// TODO: remove this 'breakpoint'
-					//if (h == 50 && w == 33) return leftImg.getDisparityMap();
-
+					// Plane refinement
+					image->planeRefinement(w, h);
 
 					if (w == wLast) break;
 				}
 				if (h == hLast) break;
 			}
-
-			logMsg("Image done." , 1);
+			logMsg("", 2);
 		}
-
-		logMsg("Iteration done #"+to_string(i), 1);
 	}
 
 	// Post processing TODO
 
-	// Return the left map
-	return leftImg.getDisparityMap();
+	// Return both disparity maps
+	return {leftImg.getDisparityMap(), rightImg.getDisparityMap()};
 }
 

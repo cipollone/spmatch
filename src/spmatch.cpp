@@ -17,6 +17,8 @@
 #include "params.hpp"
 #include "stereo.hpp"
 
+//#define DEBUG
+
 
 namespace po = boost::program_options;
 using std::string;
@@ -32,6 +34,7 @@ Params params;
 void setDefaults(void);
 void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
 		const string& disparityPath);
+void debugging(void);
 
 
 // main
@@ -53,7 +56,7 @@ int main(int argc, char *argv[]) {
 			("output,o", po::value<string>(&outputPath)->default_value(
 				"disparity.png"), "Output file")
 			("inputs,I", po::value<std::vector<string>>(&inputImages)
-				->multitoken()->required(), "Left/right images")
+				->multitoken()->required(), "Left and right images")
 			("log,l", po::value<int>(&params.LOG), "Log level {0,...,3}")
 	;
 	paramsOpts.add_options()
@@ -67,6 +70,8 @@ int main(int argc, char *argv[]) {
 			("max_d,M", po::value<int>(&params.MAX_D), "Maximum disparity")
 			("iteration,i", po::value<unsigned>(&params.ITERATIONS),
 				"Number of iterations per view")
+			("max_slope", po::value<double>(&params.MAX_SLOPE),
+				"Maximum slope of each window")
 			("normalize_gradients", po::value<bool>(
 				&params.NORMALIZE_GRADIENTS)->implicit_value(true),
 				"Whether the gradient map should be normalized")
@@ -80,7 +85,10 @@ int main(int argc, char *argv[]) {
 				"Force any internal value to be saturated")
 			("use_pseudorand", po::value<bool>(&params.USE_PSEUDORAND)
 				->implicit_value(true),
-				"Force any internal value to be saturated")
+				"Use pseudorandom numbers (repeatable computation)")
+			("const_disparities", po::value<bool>(&params.CONST_DISPARITIES)
+				->implicit_value(true),
+				"Always use constant planes")
 	;
 
 	po::positional_options_description positionalOpts;
@@ -115,6 +123,11 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+#ifdef DEBUG
+	debugging();
+	return 0;
+#endif // DEBUG
+
 	// run
 	writeDisparityMap(inputImages.at(0), inputImages.at(1), outputPath);
 
@@ -143,45 +156,62 @@ void setDefaults(void) {
 	params.GAMMA = 15;
 
 	// Range parameters
-	params.WINDOW_SIZE = 15;      // Must be an odd number TODO was 35
+	params.WINDOW_SIZE = 15;      // NOTE: Must be an odd number
 	params.MIN_D = 0;
-	params.MAX_D = 50;
-	params.ITERATIONS = 1;        // TODO the paper uses 3
+	params.MAX_D = 70;            // NOTE: must be positive
+	params.ITERATIONS = 3;
+	params.MAX_SLOPE = 45;
 
 	// Flag parameters
 	params.NORMALIZE_GRADIENTS = true; // With this false, TAU_GRAD must also change
 	params.OUT_OF_BOUNDS = Params::OutOfBounds::NAN_COST;
 	params.RESIZE_WINDOWS = true;
-	params.PLANES_SATURATION = false;
+	params.PLANES_SATURATION = true;
 	params.USE_PSEUDORAND = false;
+	params.CONST_DISPARITIES = false;
 	params.LOG = 2;               // {0,...,3}. 0 means off
 
 }
 
 
-/**************************************************************************
-* > writeDisparityMap()                                                   *
-* Given a pair of stereo images, saves the generated disparity map to the *
-* ouput path.                                                             *
-*                                                                         *
-* Args:                                                                   *
-*   leftImgPath (string): left image name/path                            *
-*   rightImgPath (string): right image name/path                          *
-*   disparityPath (string): output image name/path                        *
-**************************************************************************/
+/*************************************************************************
+* > writeDisparityMap()                                                  *
+* Given a pair of stereo images, saves the generated disparity maps of   *
+* the left and right view to the ouput path. The image will be saved as: *
+* <disparityPath_name>L.<disparityPath_ext>                              *
+* <disparityPath_name>R.<disparityPath_ext>                              *
+*                                                                        *
+* Args:                                                                  *
+*   leftImgPath (string): left image name/path                           *
+*   rightImgPath (string): right image name/path                         *
+*   disparityPath (string): output image name/path                       *
+*************************************************************************/
 void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
 		const string& disparityPath) {
+
+	// Set the path
+	auto extPos = disparityPath.rfind('.');
+	string leftDisparityPath = disparityPath;
+	string rightDisparityPath = disparityPath;
+	leftDisparityPath.insert(extPos, "L");
+	rightDisparityPath.insert(extPos, "R");
 
 	// Read the two stereo images
 	StereoImagePair stereo(leftImgPath, rightImgPath);
 
 	// Run the algorithm
-	Image disparity = stereo.computeDisparity();
+	auto disparities = stereo.computeDisparity();
+	Image& leftDisp = disparities.first;
+	Image& rightDisp = disparities.second;
 	
-	// Testing the result
-	disparity.setPath(disparityPath);
-	disparity.write();
-	disparity.display();
+	// Write the result
+	leftDisp.setPath(leftDisparityPath);
+	leftDisp.write();
+	rightDisp.setPath(rightDisparityPath);
+	rightDisp.write();
+
+	// NOTE: just to quickly see the result
+	leftDisp.display();
 }
 
 
@@ -210,3 +240,28 @@ std::istream& operator>>(std::istream& in, Params::OutOfBounds& selection) {
 	return in;
 }
 
+
+void debugging(void) {
+
+	// Testing planeRefinement()
+	StereoImage sL("tests/cones-small/im2.png", StereoImage::LEFT);
+	StereoImage sR("tests/cones-small/im6.png", StereoImage::RIGHT);
+	sL.bind(&sR);
+	sL.setRandomDisparities();
+	auto dim = sL.size();
+
+	for (unsigned i = 0; i < params.ITERATIONS; ++i) {
+		cout << "Iteration " << i << endl;
+		for (size_t w = 0; w < dim.first; ++w) {
+			for (size_t h = 0; h < dim.second; ++h) {
+				sL.planeRefinement(w, h);
+			}
+			cout << w << " " << endl;
+		}
+	}
+
+	Image disparity = sL.getDisparityMap();
+	disparity.display();
+	disparity.setPath("test.png");
+	disparity.write();
+}
