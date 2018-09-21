@@ -42,7 +42,8 @@ StereoImage::StereoImage(const string& imgPath, Side side):
 /**************************************************************************
 * > disparityAt()                                                         *
 * Returns the dispariry value at pixel (w,h), as the z-value of the plane *
-* at (w,h). NOTE: the plane must be computed, first.                      *
+* at (w,h). The z-value is saturated in [MIN_D, MAX_D].                   *
+* NOTE: the plane must be computed, first.                                *
 * NOTE: bounds are not checked.                                           *
 *                                                                         *
 * Args:                                                                   *
@@ -53,8 +54,11 @@ StereoImage::StereoImage(const string& imgPath, Side side):
 **************************************************************************/
 double StereoImage::disparityAt(size_t w, size_t h) const {
 
-	const PlaneFunction& p = disparityPlanes.get(w, h);
-	return p(w,h);
+	double d = disparityPlanes.get(w, h)(w, h);
+	if (d > params.MAX_D) d = params.MAX_D;
+	if (d < params.MIN_D) d = params.MIN_D;
+
+	return d;
 }
 
 
@@ -284,13 +288,15 @@ double StereoImage::pixelWindowCost(size_t w, size_t h,
 
 	// Check Nan cost due to borders
 	if (nPixels == 0) {
-		if ((side == LEFT && w > (unsigned)params.MAX_D) ||		// positive MAX_D
-				(side == RIGHT && w < (width - params.MAX_D))) {
+		if (((side == LEFT && w > (unsigned)params.MAX_D) ||		// positive MAX_D
+				(side == RIGHT && w < (width - params.MAX_D))) &&
+				params.PLANES_SATURATION) { // this is an error only if we
+			                              // always saturate
 			throw std::logic_error("The window of pixel (" + to_string(w) + ", " +
 					to_string(h) + ") shouldn't fall completely outside\n" +
 					"Plane: " + sStr(disparityPlanes.get(w, h)));
 		} else {
-			return 200; // NOTE: pixel on the border: can't compute disparity
+			return 300; // NOTE: pixel on the border: can't compute disparity
 		}
 	}
 	
@@ -310,13 +316,7 @@ Image StereoImage::getDisparityMap(void) const {
 	Image disp(width, height, 1);
 	for (size_t w = 0; w < width; ++w) {
 		for (size_t h = 0; h < height; ++h) {
-
-			double d = disparityAt(w, h);
-
-			// Saturation
-			if (d > params.MAX_D) d = params.MAX_D;
-			if (d < params.MIN_D) d = params.MIN_D;
-			disp(w, h) = d;
+			disp(w, h) = disparityAt(w, h);
 		}
 	}
 
@@ -532,12 +532,8 @@ bool StereoImage::planeRefinement(size_t w, size_t h) {
 	// Try different planes. Stop with a threshold
 	while (deltaZ > 0.1) {
 
-		// Get current value
-		double z = plane(w, h);
-		if (z > params.MAX_D) { z = params.MAX_D; }		   // due to propagation,
-		else if (z < params.MIN_D) { z = params.MIN_D; } // disparity might exceed
-
 		// Compute the range for Z
+		double z = disparityAt(w, h);
 		double maxZ = z + deltaZ;
 		double minZ = z - deltaZ;
 		if (maxZ > params.MAX_D) { maxZ = params.MAX_D; }
@@ -557,7 +553,7 @@ bool StereoImage::planeRefinement(size_t w, size_t h) {
 		}
 		double sampledCost = pixelWindowCost(w, h, sampledPlane);
 		if (sampledCost < thisCost) {
-			plane = sampledPlane;
+			plane = sampledPlane;  // this is a ref: modifies disparityPlanes
 			modified = true;
 			recomputeThisCost = true;
 		}
@@ -568,6 +564,73 @@ bool StereoImage::planeRefinement(size_t w, size_t h) {
 	}
 	
 	return modified;
+}
+
+
+/************************************************************************
+* > getInvalidPixelsMap()                                               *
+* Returns a black/white image with the invalidated pixels in black.     *
+* Invalidate pixels (or planes) are the coordinates in which left/right *
+* disparities do not match (differ by > 1).                             *
+*                                                                       *
+* Returns:                                                              *
+*   (Image): a map of the invalidated pixels for this image             *
+************************************************************************/
+Image StereoImage::getInvalidPixelsMap(void) const {
+
+	// checks
+	if (other == nullptr) {
+		throw std::logic_error("Instance not bound");
+	}
+
+	// Initialize the map with all valid pixels
+	Image invalidMap(width, height, 1, 255);
+
+	// Get the disparities
+	Image disparity = getDisparityMap();
+	Image oDisparity = other->getDisparityMap();
+
+	// Iterate on this image
+	for (size_t w = 0; w < width; ++w) {
+		for (size_t h = 0; h < height; ++h) {
+
+			// Coordinates of the matching pixel
+			int sign;
+			switch (side) {
+				case LEFT: sign = -1; break;
+				case RIGHT: sign = +1; break;
+			}
+			double d = disparity.get(w,h);
+			double oWD = w + sign * d;
+			if (oWD < 0 || oWD >= other->width) {  // If it is projected outside
+				invalidMap(w,h) = 0;
+				continue;
+			}
+			size_t oW = std::lround(oWD);
+
+			// Compare the other pixel dispatity
+			double oD = oDisparity.get(oW,h);
+			if (std::abs(d - oD) > 1) {
+				invalidMap(w,h) = 0;
+			}
+		}
+	}
+
+	return invalidMap;
+}
+
+
+/*****************************************************************************
+* > fillInvalidPlanes()                                                      *
+* Computes the set of invalid planes through consistency checks on the       *
+* left/right pair. Then updates the plane of invalidated pixels. The chosen  *
+* plane is the one having lower disparity among the left/right valid pixels. *
+* (Background fill)                                                          *
+*****************************************************************************/
+void StereoImage::fillInvalidPlanes(void) {
+
+	// Mark the invalid planes
+	Image invalidated = getInvalidPixelsMap();
 }
 
 
@@ -590,6 +653,21 @@ StereoImagePair::StereoImagePair(const string& leftImgPath,
 		
 	leftImg.bind(&rightImg);
 }
+
+
+/************************************************************************
+* > postProcessing()                                                    *
+* Applies the post-processing step to both images. It finds and updates *
+* invalidated planes. Then it applies a weighted median filter on the   *
+* output.                                                               *
+************************************************************************/
+void StereoImagePair::postProcessing(void) {
+
+	// Maps of invalidated pixels
+
+	// Testing
+}
+
 
 /************************************************************************
 * > computeDisparity()                                                  *
@@ -659,8 +737,9 @@ pair<Image,Image> StereoImagePair::computeDisparity(void) {
 	}
 
 	// Post processing TODO
+	logMsg("Post processing" , 1);
+	postProcessing();
 
 	// Return both disparity maps
 	return {leftImg.getDisparityMap(), rightImg.getDisparityMap()};
 }
-
