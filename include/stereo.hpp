@@ -82,11 +82,6 @@ class StereoImagePair {
 		size_t width;
 		size_t height;
 
-	private:
-
-		// private methods
-		void postProcessing(void);
-
 	public:
 
 		// constr

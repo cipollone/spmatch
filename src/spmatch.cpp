@@ -169,7 +169,7 @@ void setDefaults(void) {
 	params.PLANES_SATURATION = true;
 	params.USE_PSEUDORAND = false;
 	params.CONST_DISPARITIES = false;
-	params.LOG = 2;               // {0,...,3}. 0 means off
+	params.LOG = 1;               // {0,...,3}. 0 means off
 
 }
 
@@ -205,13 +205,8 @@ void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
 	Image& rightDisp = disparities.second;
 	
 	// Write the result
-	leftDisp.setPath(leftDisparityPath);
-	leftDisp.write();
-	rightDisp.setPath(rightDisparityPath);
-	rightDisp.write();
-
-	// NOTE: just to quickly see the result
-	leftDisp.display();
+	leftDisp.setPath(leftDisparityPath).write();
+	rightDisp.setPath(rightDisparityPath).write();
 }
 
 
@@ -243,25 +238,4 @@ std::istream& operator>>(std::istream& in, Params::OutOfBounds& selection) {
 
 void debugging(void) {
 
-	// Testing planeRefinement()
-	StereoImage sL("tests/cones-small/im2.png", StereoImage::LEFT);
-	StereoImage sR("tests/cones-small/im6.png", StereoImage::RIGHT);
-	sL.bind(&sR);
-	sL.setRandomDisparities();
-	auto dim = sL.size();
-
-	for (unsigned i = 0; i < params.ITERATIONS; ++i) {
-		cout << "Iteration " << i << endl;
-		for (size_t w = 0; w < dim.first; ++w) {
-			for (size_t h = 0; h < dim.second; ++h) {
-				sL.planeRefinement(w, h);
-			}
-			cout << w << " " << endl;
-		}
-	}
-
-	Image disparity = sL.getDisparityMap();
-	disparity.display();
-	disparity.setPath("test.png");
-	disparity.write();
 }

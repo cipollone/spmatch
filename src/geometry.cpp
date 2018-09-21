@@ -145,6 +145,19 @@ double Plane::distanceOfPoint(const Vector3d& point) const {
 }
 
 
+/********************************************************
+* > operator==                                          *
+* Equal comparison.                                     *
+*                                                       *
+* Returns:                                              *
+*   (bool): true if the parameters are exactly the same *
+********************************************************/
+bool Plane::operator==(const Plane& other) const {
+
+	return (abc == other.abc && d == other.d);
+}
+
+
 // print
 std::ostream& operator<<(std::ostream& out, const Plane& p) {
 	return out << "{ " << p.abc.transpose() << "  " << p.d << "}";

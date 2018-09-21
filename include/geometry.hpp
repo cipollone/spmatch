@@ -47,6 +47,7 @@ class Plane {
 				const Vector3d& norm);
 
 		// operator
+		bool operator==(const Plane& other) const;
 		friend std::ostream& operator<<(std::ostream& out, const Plane& p);
 
 };

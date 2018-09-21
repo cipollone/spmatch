@@ -629,8 +629,63 @@ Image StereoImage::getInvalidPixelsMap(void) const {
 *****************************************************************************/
 void StereoImage::fillInvalidPlanes(void) {
 
-	// Mark the invalid planes
-	Image invalidated = getInvalidPixelsMap();
+	// Mark the invalid planes as black
+	Image valid = getInvalidPixelsMap();
+
+	// LEFT view is filled right to left (due to errors in the left band)
+	// RIGHT view is filled left to right (due to errors in the left band)
+	int increment = (side == LEFT) ? -1 : 1;
+	size_t wFirst = (increment > 0) ? 0 : (width - 1);
+	size_t wLast = (increment > 0) ? (width - 1) : 0;
+
+	// Fill by line
+	for (size_t h = 0; h < height; ++h) {
+
+		// Save the last and next valid pixels (can't use left and right)
+		size_t wValidL = wFirst, wValidN = wFirst;
+		bool hasLast = false, hasNext = true;
+
+		// Scan each line
+		for (size_t w = wFirst; true; w += increment) {
+
+			// Should I fill this?
+			if (!valid(w,h)) {
+
+				// Find the next valid, if necessary and if has one
+				if (((increment > 0) ? (w >= wValidN) : (w <= wValidN)) && hasNext) {
+					for (size_t wI = w; true; wI += increment) {
+						if (valid(wI,h)) {
+							wValidN = wI;
+							break; // found
+						}
+						if (wI == wLast) {
+							hasNext = false;
+							break;
+						}
+					}
+				}
+
+				// Compute the disparity of (w,h) with both planes and
+				// assign the lower one
+				if (hasLast) {
+					disparityPlanes(w, h) = disparityPlanes.get(wValidL, h);
+				}
+				if (hasNext) {
+					auto& currentPlane = disparityPlanes.get(w,h);
+					auto& nextPlane = disparityPlanes.get(wValidN,h);
+					if ((currentPlane(w,h) > nextPlane(w,h)) || (!hasLast)) {
+						disparityPlanes(w,h) = nextPlane;
+					}
+				}
+
+			} else {
+				wValidL = w;
+				hasLast = true;
+			}
+
+			if (w == wLast) break;
+		}
+	}
 }
 
 
@@ -652,20 +707,6 @@ StereoImagePair::StereoImagePair(const string& leftImgPath,
 		height(leftImg.size().second) {
 		
 	leftImg.bind(&rightImg);
-}
-
-
-/************************************************************************
-* > postProcessing()                                                    *
-* Applies the post-processing step to both images. It finds and updates *
-* invalidated planes. Then it applies a weighted median filter on the   *
-* output.                                                               *
-************************************************************************/
-void StereoImagePair::postProcessing(void) {
-
-	// Maps of invalidated pixels
-
-	// Testing
 }
 
 
@@ -736,9 +777,10 @@ pair<Image,Image> StereoImagePair::computeDisparity(void) {
 		}
 	}
 
-	// Post processing TODO
+	// Post processing TODO: add weighted median filter
 	logMsg("Post processing" , 1);
-	postProcessing();
+	leftImg.fillInvalidPlanes();
+	rightImg.fillInvalidPlanes();
 
 	// Return both disparity maps
 	return {leftImg.getDisparityMap(), rightImg.getDisparityMap()};
