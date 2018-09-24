@@ -1,16 +1,17 @@
-// Testing the weighted median filter algorithm
 
-#include <string>
-#include <iostream>
-#include <vector>
+#include "numbers.hpp"
+
+#define _USE_MATH_DEFINES
 #include <cmath>
+#include <vector>
+#include <stdexcept>
+#include <string>
 #include <algorithm>
 
-using std::cout;
-using std::endl;
-using std::string;
+// TODO: change to the correct exception
 using std::vector;
 using std::pair;
+using std::string;
 
 
 /************************************************************************
@@ -93,25 +94,4 @@ double weightedMedian(const vector<double>& values,
 
 	// never happens
 	throw std::logic_error("weightedMedian(): no number selected as output");
-}
-
-
-int main(int argc, char *argv[]) {
-
-	vector<double> values = { -1,  -3,   0,  -1,   5,   5,  -5,   3,  -3};
-	vector<double> weights = { 1,  3,   1,  1,   4,   5,  5,   3,  3};
-
-	// normalize
-	double wSum = 0;
-	for (auto w: weights) {
-		wSum += w;
-	}
-	for (auto& w: weights) {
-		w /= wSum;
-	}
-
-	double res = weightedMedian(values, weights);
-	cout << res << endl;
-
-	return 0;
 }

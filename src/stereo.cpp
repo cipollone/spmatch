@@ -1,6 +1,10 @@
 
 #include "stereo.hpp"
 
+#include "params.hpp"
+#include "log.hpp"
+
+
 using std::to_string;
 
 

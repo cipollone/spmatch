@@ -28,5 +28,3 @@ add_executable(spmatch ${CPP_SOURCES})
 target_link_libraries(spmatch boost_program_options)
 target_link_libraries(spmatch Eigen3::Eigen)
 target_link_libraries(spmatch X11) # Linux/iOS specific
-
-add_executable(wmedian src/medianTest.cpp)

@@ -1,14 +1,14 @@
 
 #include "geometry.hpp"
-#include "utils.hpp"
 
-#define _USE_MATH_DEFINES
-#include <cmath>
-#include <random>
 #include <Eigen/Geometry>
+
+#include "numbers.hpp"
+
 
 using Eigen::Matrix3d;
 using Eigen::AngleAxisd;
+using std::string;
 
 
 // > class Plane

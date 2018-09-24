@@ -1,9 +1,8 @@
 
 #pragma once
 
-#include "utils.hpp"
-#include "params.hpp"
 #include "image.hpp"
+#include "grid.hpp"
 
 
 /******************************************************************************
@@ -41,7 +40,7 @@ class StereoImage {
 		double adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2) const;
 		double pixelWindowCost(size_t w, size_t h, const PlaneFunction& d) const;
 		double disparityAt(size_t w, size_t h) const;
-		Image getInvalidPixelsMap(void) const;
+		Image getInvalidPixelsMap(void) const;  // TODO: change output
 
 	public:
 

@@ -4,7 +4,6 @@
 #include <string>
 
 #include "geometry.hpp"
-#include "utils.hpp"
 
 #include <CImg.h>         // NOTE: including this before geometry.hpp
                           // (therefore Eigen) results in a compilation error
