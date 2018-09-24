@@ -99,11 +99,11 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 	
 	// checks
 	if (other == nullptr) {
-		throw std::logic_error("Instance not bound");
+		throw std::logic_error("pixelDissimilarity(). Instance not bound");
 	}
 	if (w >= width || h >= height) {
-		throw std::runtime_error("Out of bounds (" + to_string(w) +
-				", " + to_string(h) + ")");
+		throw std::range_error("pixelDissimilarity(). Out of bounds (" +
+				to_string(w) + ", " + to_string(h) + ")");
 	}
 
 	// Disparity
@@ -125,7 +125,7 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 
 	// Is (qW, qH) out of the image?
 	bool qIsOut = false;
-	if (qW < 0 || qW >= other->width) {
+	if (qW < 0 || qW > (other->width-1)) {
 		qIsOut = true;
 
 		switch (params.OUT_OF_BOUNDS) {
@@ -134,8 +134,9 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 			case Params::OutOfBounds::NAN_COST:
 				return std::numeric_limits<double>::quiet_NaN();
 			case Params::OutOfBounds::ERROR:
-				throw std::logic_error("The pixel (" + to_string(qW) + ", " +
-						to_string(qH) + ") in the other view is out of bounds");
+				throw std::range_error("pixelDissimilarity(). The pixel (" +
+						to_string(qW) + ", " + to_string(qH) +
+						") in the other view is out of bounds");
 			case Params::OutOfBounds::REPEAT_PIXEL:
 				qIsOut = false;		// false means solved; no 'break;' here
 			case Params::OutOfBounds::BLACK_PIXEL:
@@ -199,12 +200,12 @@ double StereoImage::adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2)
 
 	// checks
 	if (w1 >= width || h1 >= height) {
-		throw std::runtime_error("Out of bounds (" + to_string(w1) +
-				", " + to_string(h1) + ")");
+		throw std::domain_error("adaptiveWeight(). Out of bounds (" +
+				to_string(w1) + ", " + to_string(h1) + ")");
 	}
 	if (w2 >= width || h2 >= height) {
-		throw std::runtime_error("Out of bounds (" + to_string(w2) +
-				", " + to_string(h2) + ")");
+		throw std::domain_error("adaptiveWeight(). Out of bounds (" +
+				to_string(w2) + ", " + to_string(h2) + ")");
 	}
 
 	// Colour of the first point
@@ -246,8 +247,8 @@ double StereoImage::pixelWindowCost(size_t w, size_t h,
 	
 	// checks
 	if (w >= width || h >= height) {
-		throw std::runtime_error("Out of bounds (" + to_string(w) +
-				", " + to_string(h) + ")");
+		throw std::domain_error("pixelWindowCost(). Out of bounds (" +
+				to_string(w) + ", " + to_string(h) + ")");
 	}
 
 	// Setting the lenght of the window
@@ -296,8 +297,9 @@ double StereoImage::pixelWindowCost(size_t w, size_t h,
 				(side == RIGHT && w < (width - params.MAX_D))) &&
 				params.PLANES_SATURATION) { // this is an error only if we
 			                              // always saturate
-			throw std::logic_error("The window of pixel (" + to_string(w) + ", " +
-					to_string(h) + ") shouldn't fall completely outside\n" +
+			throw std::logic_error("pixelWindowCost(). The window of pixel (" +
+					to_string(w) + ", " + to_string(h) +
+					") shouldn't fall completely outside\n" +
 					"Plane: " + sStr(disparityPlanes.get(w, h)));
 		} else {
 			return 300; // NOTE: pixel on the border: can't compute disparity
@@ -340,10 +342,10 @@ void StereoImage::bind(StereoImage* o) {
 
 	// checks
 	if (o == nullptr || o == this) {
-		throw std::logic_error("Bad pointer");
+		throw std::logic_error("bind(). Bad pointer");
 	}
 	if (other != nullptr || o->other != nullptr) {
-		throw std::logic_error("An instance is bound already");
+		throw std::logic_error("bind(). An instance is bound already");
 	}
 
 	// bind
@@ -360,7 +362,7 @@ void StereoImage::unbind(void) {
 
 	// checks
 	if (other == nullptr) {
-		throw std::logic_error("Unbound already");
+		throw std::logic_error("unbind(). Unbound already");
 	}
 
 	// unbind
@@ -468,7 +470,7 @@ bool StereoImage::pixelViewPropagation(size_t w, size_t h) {
 
 	// check
 	if (other == nullptr) {
-		throw std::logic_error("Instance not bound");
+		throw std::logic_error("pixelViewPropagation(). Instance not bound");
 	}
 
 	bool modified = false;
@@ -584,7 +586,7 @@ Image StereoImage::getInvalidPixelsMap(void) const {
 
 	// checks
 	if (other == nullptr) {
-		throw std::logic_error("Instance not bound");
+		throw std::logic_error("getInvalidPixelsMap(). Instance not bound");
 	}
 
 	// Initialize the map with all valid pixels

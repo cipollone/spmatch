@@ -14,7 +14,7 @@ Image::Image(const string& imgPath):
 	
 	if (channels != 1 && channels != 3) {
 		throw std::runtime_error(
-				"Wrong image format: " + std::to_string(channels) +
+				"Image(). Wrong image format: " + std::to_string(channels) +
 				" channels; only RGB and Grayscale supported");
 	}
 }
@@ -32,8 +32,8 @@ Image::Image(size_t width, size_t height, size_t channels):
 		width(width), height(height), channels(channels) {
 
 	if (channels != 1 && channels != 3) {
-		throw std::logic_error(
-				"Wrong image format: " + std::to_string(channels) +
+		throw std::invalid_argument(
+				"Image(). Wrong image format: " + std::to_string(channels) +
 				" channels; only RGB and Grayscale supported");
 	}
 }
@@ -52,8 +52,8 @@ Image::Image(size_t width, size_t height, size_t channels, double val):
 		width(width), height(height), channels(channels) {
 
 	if (channels != 1 && channels != 3) {
-		throw std::logic_error(
-				"Wrong image format: " + std::to_string(channels) +
+		throw std::invalid_argument(
+				"Image(). Wrong image format: " + std::to_string(channels) +
 				" channels; only RGB and Grayscale supported");
 	}
 }
@@ -92,7 +92,8 @@ size_t Image::size(unsigned dim) const {
 		case 2:
 			return channels;
 		default:
-			throw std::logic_error(std::to_string(dim) +
+			throw std::domain_error(string() +
+					"size(). " + std::to_string(dim) +
 					" is not a dimension {0,1,2}");
 	}
 }
@@ -108,11 +109,13 @@ double Image::at(double w, double h, size_t c) const {
 
 	// checks
 	if (c >= channels) {
-		throw std::logic_error("Wrong channel, " + std::to_string(c) +
+		throw std::domain_error(string() +
+				"at(). " + "Wrong channel, " + std::to_string(c) +
 				" of [0, " + std::to_string(channels-1) + "]");
 	}
-	if (w >= width || h >= height || w < 0 || h < 0) {
-		throw std::logic_error("Wrong coorinate, (" + std::to_string(w) +
+	if (w > (width-1) || h > (height-1) || w < 0 || h < 0) {
+		throw std::domain_error(string() +
+				"at(). " + "Wrong coorinate, (" + std::to_string(w) +
 				", " + std::to_string(h) + ") of (0, 0) -- (" +
 				std::to_string(width-1) + ", " + std::to_string(height-1) + ")");
 	}

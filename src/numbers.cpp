@@ -8,7 +8,6 @@
 #include <string>
 #include <algorithm>
 
-// TODO: change to the correct exception
 using std::vector;
 using std::pair;
 using std::string;
@@ -37,21 +36,21 @@ double weightedMedian(const vector<double>& values,
 
 	// checks
 	if (values.size() == 0) {
-		throw std::runtime_error("weightedMedian(): emtpy input");
+		throw std::invalid_argument("weightedMedian(). emtpy input");
 	}
 	if (values.size() != weights.size()) {
-		throw std::runtime_error("weightedMedian(): inconsistent sizes");
+		throw std::invalid_argument("weightedMedian(). inconsistent sizes");
 	}
 	double wSum = 0;
 	for (auto w: weights) {
 		if (w <= 0) {
-			throw std::runtime_error("weightedMedian(): Weights must be positive.");
+			throw std::domain_error("weightedMedian(). Weights must be positive.");
 		}
 		wSum += w;
 	}
 	if (!areEqualWeights(wSum, 1)) {
-		throw std::runtime_error(string() +
-				"weightedMedian(): the sum of all weights must be 1. It's " +
+		throw std::invalid_argument(string() +
+				"weightedMedian(). the sum of all weights must be 1. It's " +
 				std::to_string(wSum));
 	}
 
@@ -93,5 +92,5 @@ double weightedMedian(const vector<double>& values,
 	}
 
 	// never happens
-	throw std::logic_error("weightedMedian(): no number selected as output");
+	throw std::logic_error("weightedMedian(). no number selected as output");
 }
