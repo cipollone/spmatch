@@ -74,7 +74,7 @@ double weightedMedian(const vector<double>& values,
 		auto& val = vec[i];
 
 		// Base case: two median values.
-		if (areEqualWeights(wSumL, wSumR)) {  // vec[i] is the upper median
+		if (areEqualWeights(wSumL, 0.5)) {  // vec[i] is the upper median
 			return (vec[i-1].first + vec[i].first)/2;
 		}
 
@@ -91,6 +91,6 @@ double weightedMedian(const vector<double>& values,
 		wSumL += val.second;
 	}
 
-	// never happens
+	// Should never happen
 	throw std::logic_error("weightedMedian(). no number selected as output");
 }

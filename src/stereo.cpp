@@ -3,6 +3,7 @@
 
 #include "params.hpp"
 #include "log.hpp"
+#include "numbers.hpp"
 
 
 using std::to_string;
@@ -573,15 +574,16 @@ bool StereoImage::planeRefinement(size_t w, size_t h) {
 }
 
 
-/************************************************************************
-* > getInvalidPixelsMap()                                               *
-* Returns a black/white image with the invalidated pixels in black.     *
-* Invalidate pixels (or planes) are the coordinates in which left/right *
-* disparities do not match (differ by > 1).                             *
-*                                                                       *
-* Returns:                                                              *
-*   (Image): a map of the invalidated pixels for this image             *
-************************************************************************/
+/*************************************************************************
+* > getInvalidPixelsMap()                                                *
+* Returns a black/white image: invalid pixels are marked as white; valid *
+* pixels have 0 value (black).                                           *
+* Invalidated pixels (planes) are the coordinates in which left/right    *
+* disparities do not match (they differ by > 1).                         *
+*                                                                        *
+* Returns:                                                               *
+*   (Image): a map of the valid pixels for this image                    *
+*************************************************************************/
 Image StereoImage::getInvalidPixelsMap(void) const {
 
 	// checks
@@ -590,7 +592,7 @@ Image StereoImage::getInvalidPixelsMap(void) const {
 	}
 
 	// Initialize the map with all valid pixels
-	Image invalidMap(width, height, 1, 255);
+	Image invalidMap(width, height, 1, 0);
 
 	// Get the disparities
 	Image disparity = getDisparityMap();
@@ -609,7 +611,7 @@ Image StereoImage::getInvalidPixelsMap(void) const {
 			double d = disparity.get(w,h);
 			double oWD = w + sign * d;
 			if (oWD < 0 || oWD >= other->width) {  // If it is projected outside
-				invalidMap(w,h) = 0;
+				invalidMap(w,h) = 255;
 				continue;
 			}
 			size_t oW = std::lround(oWD);
@@ -617,7 +619,7 @@ Image StereoImage::getInvalidPixelsMap(void) const {
 			// Compare the other pixel dispatity
 			double oD = oDisparity.get(oW,h);
 			if (std::abs(d - oD) > 1) {
-				invalidMap(w,h) = 0;
+				invalidMap(w,h) = 255;
 			}
 		}
 	}
@@ -632,11 +634,12 @@ Image StereoImage::getInvalidPixelsMap(void) const {
 * left/right pair. Then updates the plane of invalidated pixels. The chosen  *
 * plane is the one having lower disparity among the left/right valid pixels. *
 * (Background fill)                                                          *
+*                                                                            *
+* Args:                                                                      *
+*   invalid (Image): map of valid and invalid pixels.                        *
+*                    (see getInvalidPixelsMap())                             *
 *****************************************************************************/
-void StereoImage::fillInvalidPlanes(void) {
-
-	// Mark the invalid planes as black
-	Image valid = getInvalidPixelsMap();
+void StereoImage::fillInvalidPlanes(const Image& invalid) {
 
 	// LEFT view is filled right to left (due to errors in the left band)
 	// RIGHT view is filled left to right (due to errors in the left band)
@@ -655,12 +658,12 @@ void StereoImage::fillInvalidPlanes(void) {
 		for (size_t w = wFirst; true; w += increment) {
 
 			// Should I fill this?
-			if (!valid(w,h)) {
+			if (invalid.get(w,h)) {
 
 				// Find the next valid, if necessary and if has one
 				if (((increment > 0) ? (w >= wValidN) : (w <= wValidN)) && hasNext) {
 					for (size_t wI = w; true; wI += increment) {
-						if (valid(wI,h)) {
+						if (!invalid.get(wI,h)) {
 							wValidN = wI;
 							break; // found
 						}
@@ -695,6 +698,100 @@ void StereoImage::fillInvalidPlanes(void) {
 }
 
 
+/**************************************************************************
+* > wMedianFilterAtDisparity()                                            *
+* Runs a weighted median filter on the pixels of 'disp', marked in 'map'. *
+* 'disp' is a grayscale image. Marked pixels are white                    *
+* (or non black, i.e. != 0) in 'map'. The filter uses the window          *
+* and weights given by params.WINDOW_SIZE and adaptiveWeight().           *
+*                                                                         *
+* Args:                                                                   *
+*   disp (Image): the disparity map of 'this' image                       *
+*   map (Image): the map of the pixels to process.                        *
+*                                                                         *
+* Returns:                                                                *
+*   (Image): the filtered disparity map                                   *
+**************************************************************************/
+Image StereoImage::wMedianFilterAtDisparity(const Image& disp,
+		const Image& map) const {
+
+	// Definitions
+	Image out(width, height, 1);
+	std::vector<double> values;
+	std::vector<double> weights;
+
+	// Scan the whole image
+	for (size_t w = 0; w < width; ++w) {
+		for (size_t h = 0; h < height; ++h) {
+
+			// If this pixel should be filtered
+			if (map.get(w,h)) {
+
+				// Selecting a squared window around (w,h). See pixelWindowCost()
+				unsigned halfSideW = params.WINDOW_SIZE / 2;
+				unsigned halfSideH = params.WINDOW_SIZE / 2;
+				size_t minW = (w > halfSideW) ? (w - halfSideW) : 0;
+				size_t maxW = (w + halfSideW >= width) ? (width - 1) : (w + halfSideW);
+				size_t minH = (h > halfSideH) ? (h - halfSideH) : 0;
+				size_t maxH = (h + halfSideH >= height) ? (height - 1) : (h + halfSideH);
+					// NOTE: not using a resized window for simplicity
+				
+				// Accumulate the pixels values within the window
+				weights.clear();
+				values.clear();
+				for (size_t iW = minW; iW <= maxW; ++iW) {
+					for (size_t iH = minH; iH <= maxH; ++iH) {
+						weights.push_back(adaptiveWeight(w, h, iW, iH));
+						values.push_back(disp.get(iW,iH));
+					}
+				}
+
+				// Normalize the weights
+				double wSum = 0;
+				for (const double& w: weights) { wSum += w; }
+				for (double& w: weights) { w /= wSum; }
+
+				// Apply the filter
+				out(w,h) = weightedMedian(values, weights);
+
+			} else {
+
+				// Just copy
+				out(w,h) = disp.get(w,h);
+			}
+		}
+	}
+
+	return out;
+}
+
+
+/***********************************************************************
+* > processFinalDisparityMap()                                         *
+* As getDisparityMap(), this function returns the disparity map as a   *
+* grayscale image, produced by the value of each plane at the pixel's  *
+* coordinate. However, it also performs some post processing. First it *
+* calls fillInvalidPlanes(), then it calls wMedianFilterAtDisparity()  *
+* on those pixels.                                                     *
+*                                                                      *
+* Returns:                                                             *
+*   (Image): The disparity map                                         *
+***********************************************************************/
+Image StereoImage::processFinalDisparityMap(void) {
+
+	// Find the invalid pixels
+	Image invalid = getInvalidPixelsMap();
+
+	// Fill them
+	fillInvalidPlanes(invalid);
+
+	// Weighted median filter on invalid pixels
+	Image disparity = wMedianFilterAtDisparity(getDisparityMap(), invalid);
+
+	return disparity;
+}
+
+
 // > class StereoImagePair
 
 /******************************************************
@@ -713,6 +810,12 @@ StereoImagePair::StereoImagePair(const string& leftImgPath,
 		height(leftImg.size().second) {
 		
 	leftImg.bind(&rightImg);
+
+	if (leftImg.size() != rightImg.size()) {
+		throw std::invalid_argument(string() +
+				"StereoImagePair(). " +
+				"Left and right images must have the same dimension.");
+	}
 }
 
 
@@ -729,9 +832,10 @@ StereoImagePair::StereoImagePair(const string& leftImgPath,
 pair<Image,Image> StereoImagePair::computeDisparity(void) {
 
 	// Random Initialization
+	logMsg("Random Initialization", 1, ' ');
 	leftImg.setRandomDisparities();
 	rightImg.setRandomDisparities();
-	logMsg("Random Initialization done", 1);
+	logMsg("done", 1);
 
 	// For each iteration
 	for (unsigned i = 0; i < params.ITERATIONS; ++i) {
@@ -783,11 +887,11 @@ pair<Image,Image> StereoImagePair::computeDisparity(void) {
 		}
 	}
 
-	// Post processing TODO: add weighted median filter
+	// Post processing
 	logMsg("Post processing" , 1);
-	leftImg.fillInvalidPlanes();
-	rightImg.fillInvalidPlanes();
+	Image leftDisp = leftImg.processFinalDisparityMap();
+	Image rightDisp = rightImg.processFinalDisparityMap();
 
 	// Return both disparity maps
-	return {leftImg.getDisparityMap(), rightImg.getDisparityMap()};
+	return std::make_pair(leftDisp, rightDisp);
 }

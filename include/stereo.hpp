@@ -40,7 +40,11 @@ class StereoImage {
 		double adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2) const;
 		double pixelWindowCost(size_t w, size_t h, const PlaneFunction& d) const;
 		double disparityAt(size_t w, size_t h) const;
-		Image getInvalidPixelsMap(void) const;  // TODO: change output
+		Image getInvalidPixelsMap(void) const;
+		Image wMedianFilterAtDisparity(const Image& disp, const Image& map) const;
+
+		// private methods
+		void fillInvalidPlanes(const Image& invalid);
 
 	public:
 
@@ -51,8 +55,8 @@ class StereoImage {
 
 		// const methods
 		void displayGradients(void) const;
-		Image getDisparityMap(void) const;
 		pair<size_t, size_t> size(void) const { return { width, height }; }
+		Image getDisparityMap(void) const;
 
 		// methods
 		void bind(StereoImage* o);
@@ -61,7 +65,7 @@ class StereoImage {
 		bool pixelSpatialPropagation(size_t w, size_t h, unsigned iteration);
 		bool pixelViewPropagation(size_t w, size_t h);
 		bool planeRefinement(size_t w, size_t h);
-		void fillInvalidPlanes(void);
+		Image processFinalDisparityMap(void);
 };
 
 
