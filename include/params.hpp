@@ -32,6 +32,7 @@ struct Params {
 	bool PLANES_SATURATION;
 	bool USE_PSEUDORAND;
 	bool CONST_DISPARITIES;
+	bool NORMALIZE_OUTPUT;         // If true, the output map is in [0,255]
 	int LOG;                       // {0,...,3}. 0 means off
 
 };

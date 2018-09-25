@@ -1,14 +1,15 @@
 
 #include "geometry.hpp"
-#include "utils.hpp"
 
-#define _USE_MATH_DEFINES
-#include <cmath>
-#include <random>
 #include <Eigen/Geometry>
+
+#include "numbers.hpp"
+#include "log.hpp"
+
 
 using Eigen::Matrix3d;
 using Eigen::AngleAxisd;
+using std::string;
 
 
 // > class Plane
@@ -145,6 +146,19 @@ double Plane::distanceOfPoint(const Vector3d& point) const {
 }
 
 
+/********************************************************
+* > operator==                                          *
+* Equal comparison.                                     *
+*                                                       *
+* Returns:                                              *
+*   (bool): true if the parameters are exactly the same *
+********************************************************/
+bool Plane::operator==(const Plane& other) const {
+
+	return (abc == other.abc && d == other.d);
+}
+
+
 // print
 std::ostream& operator<<(std::ostream& out, const Plane& p) {
 	return out << "{ " << p.abc.transpose() << "  " << p.d << "}";
@@ -219,8 +233,9 @@ PlaneFunction& PlaneFunction::setPlane(const Vector3d& abc, double d) {
 
 	Plane::setPlane(abc, d);
 	if (!areFunctionParams(abc)) {
-		throw std::runtime_error("Plane coefficient for z < Z_EPS (in norm): " +
-				std::to_string(abc(2)));
+		throw std::invalid_argument(string() +
+				"setPlane(). The input vector do not represent a function. z = " +
+				std::to_string(std::abs(this->abc(2))) + " < Z_EPS) ");
 	}
 
 	return *this;
@@ -280,8 +295,9 @@ PlaneFunction& PlaneFunction::setRandomFunction(double x, double y,
 
 	// Check
 	if (maxAngle > 90 || maxAngle <= 0) {
-		throw std::runtime_error(std::to_string(maxAngle) + " is not a valid " + 
-				"maximum plane angle for setRandomFunction()");
+		throw std::domain_error(string() +
+				"setRandomFunction(). " + std::to_string(maxAngle) +
+				" is not a valid maximum plane angle.");
 	}
 	
 	// Sampling in the point--normal representation
@@ -361,13 +377,15 @@ PlaneFunction PlaneFunction::getNeighbourFunction(double x, double y,
 
 	// checks
 	if (maxZ <= minZ) {
-		throw std::runtime_error("[ " + std::to_string(minZ) +
+		throw std::domain_error(string() +
+				"getNeighbourFunction(). " + "[ " + std::to_string(minZ) +
 				", " + std::to_string(maxZ) + "] is not a valid Z range");
 	}
 	if (deltaAng <= 0 || deltaAng >= 90) {
-		throw std::runtime_error(string() +
-				"deltaT parameter of setNeighbourFunction() " +
-				"must be in the range (0,90).");
+		throw std::domain_error(string() +
+				"getNeighbourFunction(). " +
+				"deltaT parameter must be in the range (0,90). It's " +
+				std::to_string(deltaAng));
 	}
 
 	// Get the representation of the old plane at (x,y)
@@ -419,8 +437,10 @@ PlaneFunction& PlaneFunction::fromPointAndNorm(const Vector3d& point,
 
 	Plane::fromPointAndNorm(point, norm);
 	if (!areFunctionParams(abc)) {
-		throw std::runtime_error("Plane coefficient for z < Z_EPS (in norm): " +
-				std::to_string(abc(2)));
+		throw std::invalid_argument(string() +
+				"fromPointAndNorm(). " +
+				"The input vector do not represent a function. z = " +
+				std::to_string(std::abs(this->abc(2))) + " < Z_EPS) ");
 	}
 
 	return *this;

@@ -1,6 +1,11 @@
 
 #include "stereo.hpp"
 
+#include "params.hpp"
+#include "log.hpp"
+#include "numbers.hpp"
+
+
 using std::to_string;
 
 
@@ -42,7 +47,8 @@ StereoImage::StereoImage(const string& imgPath, Side side):
 /**************************************************************************
 * > disparityAt()                                                         *
 * Returns the dispariry value at pixel (w,h), as the z-value of the plane *
-* at (w,h). NOTE: the plane must be computed, first.                      *
+* at (w,h). The z-value is saturated in [MIN_D, MAX_D].                   *
+* NOTE: the plane must be computed, first.                                *
 * NOTE: bounds are not checked.                                           *
 *                                                                         *
 * Args:                                                                   *
@@ -53,8 +59,11 @@ StereoImage::StereoImage(const string& imgPath, Side side):
 **************************************************************************/
 double StereoImage::disparityAt(size_t w, size_t h) const {
 
-	const PlaneFunction& p = disparityPlanes.get(w, h);
-	return p(w,h);
+	double d = disparityPlanes.get(w, h)(w, h);
+	if (d > params.MAX_D) d = params.MAX_D;
+	if (d < params.MIN_D) d = params.MIN_D;
+
+	return d;
 }
 
 
@@ -91,11 +100,11 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 	
 	// checks
 	if (other == nullptr) {
-		throw std::logic_error("Instance not bound");
+		throw std::logic_error("pixelDissimilarity(). Instance not bound");
 	}
 	if (w >= width || h >= height) {
-		throw std::runtime_error("Out of bounds (" + to_string(w) +
-				", " + to_string(h) + ")");
+		throw std::range_error("pixelDissimilarity(). Out of bounds (" +
+				to_string(w) + ", " + to_string(h) + ")");
 	}
 
 	// Disparity
@@ -117,7 +126,7 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 
 	// Is (qW, qH) out of the image?
 	bool qIsOut = false;
-	if (qW < 0 || qW >= other->width) {
+	if (qW < 0 || qW > (other->width-1)) {
 		qIsOut = true;
 
 		switch (params.OUT_OF_BOUNDS) {
@@ -126,8 +135,9 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 			case Params::OutOfBounds::NAN_COST:
 				return std::numeric_limits<double>::quiet_NaN();
 			case Params::OutOfBounds::ERROR:
-				throw std::logic_error("The pixel (" + to_string(qW) + ", " +
-						to_string(qH) + ") in the other view is out of bounds");
+				throw std::range_error("pixelDissimilarity(). The pixel (" +
+						to_string(qW) + ", " + to_string(qH) +
+						") in the other view is out of bounds");
 			case Params::OutOfBounds::REPEAT_PIXEL:
 				qIsOut = false;		// false means solved; no 'break;' here
 			case Params::OutOfBounds::BLACK_PIXEL:
@@ -191,12 +201,12 @@ double StereoImage::adaptiveWeight(size_t w1, size_t h1, size_t w2, size_t h2)
 
 	// checks
 	if (w1 >= width || h1 >= height) {
-		throw std::runtime_error("Out of bounds (" + to_string(w1) +
-				", " + to_string(h1) + ")");
+		throw std::domain_error("adaptiveWeight(). Out of bounds (" +
+				to_string(w1) + ", " + to_string(h1) + ")");
 	}
 	if (w2 >= width || h2 >= height) {
-		throw std::runtime_error("Out of bounds (" + to_string(w2) +
-				", " + to_string(h2) + ")");
+		throw std::domain_error("adaptiveWeight(). Out of bounds (" +
+				to_string(w2) + ", " + to_string(h2) + ")");
 	}
 
 	// Colour of the first point
@@ -238,8 +248,8 @@ double StereoImage::pixelWindowCost(size_t w, size_t h,
 	
 	// checks
 	if (w >= width || h >= height) {
-		throw std::runtime_error("Out of bounds (" + to_string(w) +
-				", " + to_string(h) + ")");
+		throw std::domain_error("pixelWindowCost(). Out of bounds (" +
+				to_string(w) + ", " + to_string(h) + ")");
 	}
 
 	// Setting the lenght of the window
@@ -284,13 +294,16 @@ double StereoImage::pixelWindowCost(size_t w, size_t h,
 
 	// Check Nan cost due to borders
 	if (nPixels == 0) {
-		if ((side == LEFT && w > (unsigned)params.MAX_D) ||		// positive MAX_D
-				(side == RIGHT && w < (width - params.MAX_D))) {
-			throw std::logic_error("The window of pixel (" + to_string(w) + ", " +
-					to_string(h) + ") shouldn't fall completely outside\n" +
+		if (((side == LEFT && w > (unsigned)params.MAX_D) ||		// positive MAX_D
+				(side == RIGHT && w < (width - params.MAX_D))) &&
+				params.PLANES_SATURATION) { // this is an error only if we
+			                              // always saturate
+			throw std::logic_error("pixelWindowCost(). The window of pixel (" +
+					to_string(w) + ", " + to_string(h) +
+					") shouldn't fall completely outside\n" +
 					"Plane: " + sStr(disparityPlanes.get(w, h)));
 		} else {
-			return 200; // NOTE: pixel on the border: can't compute disparity
+			return 300; // NOTE: pixel on the border: can't compute disparity
 		}
 	}
 	
@@ -310,13 +323,7 @@ Image StereoImage::getDisparityMap(void) const {
 	Image disp(width, height, 1);
 	for (size_t w = 0; w < width; ++w) {
 		for (size_t h = 0; h < height; ++h) {
-
-			double d = disparityAt(w, h);
-
-			// Saturation
-			if (d > params.MAX_D) d = params.MAX_D;
-			if (d < params.MIN_D) d = params.MIN_D;
-			disp(w, h) = d;
+			disp(w, h) = disparityAt(w, h);
 		}
 	}
 
@@ -336,10 +343,10 @@ void StereoImage::bind(StereoImage* o) {
 
 	// checks
 	if (o == nullptr || o == this) {
-		throw std::logic_error("Bad pointer");
+		throw std::logic_error("bind(). Bad pointer");
 	}
 	if (other != nullptr || o->other != nullptr) {
-		throw std::logic_error("An instance is bound already");
+		throw std::logic_error("bind(). An instance is bound already");
 	}
 
 	// bind
@@ -356,7 +363,7 @@ void StereoImage::unbind(void) {
 
 	// checks
 	if (other == nullptr) {
-		throw std::logic_error("Unbound already");
+		throw std::logic_error("unbind(). Unbound already");
 	}
 
 	// unbind
@@ -464,7 +471,7 @@ bool StereoImage::pixelViewPropagation(size_t w, size_t h) {
 
 	// check
 	if (other == nullptr) {
-		throw std::logic_error("Instance not bound");
+		throw std::logic_error("pixelViewPropagation(). Instance not bound");
 	}
 
 	bool modified = false;
@@ -532,12 +539,8 @@ bool StereoImage::planeRefinement(size_t w, size_t h) {
 	// Try different planes. Stop with a threshold
 	while (deltaZ > 0.1) {
 
-		// Get current value
-		double z = plane(w, h);
-		if (z > params.MAX_D) { z = params.MAX_D; }		   // due to propagation,
-		else if (z < params.MIN_D) { z = params.MIN_D; } // disparity might exceed
-
 		// Compute the range for Z
+		double z = disparityAt(w, h);
 		double maxZ = z + deltaZ;
 		double minZ = z - deltaZ;
 		if (maxZ > params.MAX_D) { maxZ = params.MAX_D; }
@@ -557,7 +560,7 @@ bool StereoImage::planeRefinement(size_t w, size_t h) {
 		}
 		double sampledCost = pixelWindowCost(w, h, sampledPlane);
 		if (sampledCost < thisCost) {
-			plane = sampledPlane;
+			plane = sampledPlane;  // this is a ref: modifies disparityPlanes
 			modified = true;
 			recomputeThisCost = true;
 		}
@@ -568,6 +571,224 @@ bool StereoImage::planeRefinement(size_t w, size_t h) {
 	}
 	
 	return modified;
+}
+
+
+/*************************************************************************
+* > getInvalidPixelsMap()                                                *
+* Returns a black/white image: invalid pixels are marked as white; valid *
+* pixels have 0 value (black).                                           *
+* Invalidated pixels (planes) are the coordinates in which left/right    *
+* disparities do not match (they differ by > 1).                         *
+*                                                                        *
+* Returns:                                                               *
+*   (Image): a map of the valid pixels for this image                    *
+*************************************************************************/
+Image StereoImage::getInvalidPixelsMap(void) const {
+
+	// checks
+	if (other == nullptr) {
+		throw std::logic_error("getInvalidPixelsMap(). Instance not bound");
+	}
+
+	// Initialize the map with all valid pixels
+	Image invalidMap(width, height, 1, 0);
+
+	// Get the disparities
+	Image disparity = getDisparityMap();
+	Image oDisparity = other->getDisparityMap();
+
+	// Iterate on this image
+	for (size_t w = 0; w < width; ++w) {
+		for (size_t h = 0; h < height; ++h) {
+
+			// Coordinates of the matching pixel
+			int sign;
+			switch (side) {
+				case LEFT: sign = -1; break;
+				case RIGHT: sign = +1; break;
+			}
+			double d = disparity.get(w,h);
+			double oWD = w + sign * d;
+			if (oWD < 0 || oWD >= other->width) {  // If it is projected outside
+				invalidMap(w,h) = 255;
+				continue;
+			}
+			size_t oW = std::lround(oWD);
+
+			// Compare the other pixel dispatity
+			double oD = oDisparity.get(oW,h);
+			if (std::abs(d - oD) > 1) {
+				invalidMap(w,h) = 255;
+			}
+		}
+	}
+
+	return invalidMap;
+}
+
+
+/*****************************************************************************
+* > fillInvalidPlanes()                                                      *
+* Computes the set of invalid planes through consistency checks on the       *
+* left/right pair. Then updates the plane of invalidated pixels. The chosen  *
+* plane is the one having lower disparity among the left/right valid pixels. *
+* (Background fill)                                                          *
+*                                                                            *
+* Args:                                                                      *
+*   invalid (Image): map of valid and invalid pixels.                        *
+*                    (see getInvalidPixelsMap())                             *
+*****************************************************************************/
+void StereoImage::fillInvalidPlanes(const Image& invalid) {
+
+	// LEFT view is filled right to left (due to errors in the left band)
+	// RIGHT view is filled left to right (due to errors in the left band)
+	int increment = (side == LEFT) ? -1 : 1;
+	size_t wFirst = (increment > 0) ? 0 : (width - 1);
+	size_t wLast = (increment > 0) ? (width - 1) : 0;
+
+	// Fill by line
+	for (size_t h = 0; h < height; ++h) {
+
+		// Save the last and next valid pixels (can't use left and right)
+		size_t wValidL = wFirst, wValidN = wFirst;
+		bool hasLast = false, hasNext = true;
+
+		// Scan each line
+		for (size_t w = wFirst; true; w += increment) {
+
+			// Should I fill this?
+			if (invalid.get(w,h)) {
+
+				// Find the next valid, if necessary and if has one
+				if (((increment > 0) ? (w >= wValidN) : (w <= wValidN)) && hasNext) {
+					for (size_t wI = w; true; wI += increment) {
+						if (!invalid.get(wI,h)) {
+							wValidN = wI;
+							break; // found
+						}
+						if (wI == wLast) {
+							hasNext = false;
+							break;
+						}
+					}
+				}
+
+				// Compute the disparity of (w,h) with both planes and
+				// assign the lower one
+				if (hasLast) {
+					disparityPlanes(w, h) = disparityPlanes.get(wValidL, h);
+				}
+				if (hasNext) {
+					auto& currentPlane = disparityPlanes.get(w,h);
+					auto& nextPlane = disparityPlanes.get(wValidN,h);
+					if ((currentPlane(w,h) > nextPlane(w,h)) || (!hasLast)) {
+						disparityPlanes(w,h) = nextPlane;
+					}
+				}
+
+			} else {
+				wValidL = w;
+				hasLast = true;
+			}
+
+			if (w == wLast) break;
+		}
+	}
+}
+
+
+/**************************************************************************
+* > wMedianFilterAtDisparity()                                            *
+* Runs a weighted median filter on the pixels of 'disp', marked in 'map'. *
+* 'disp' is a grayscale image. Marked pixels are white                    *
+* (or non black, i.e. != 0) in 'map'. The filter uses the window          *
+* and weights given by params.WINDOW_SIZE and adaptiveWeight().           *
+*                                                                         *
+* Args:                                                                   *
+*   disp (Image): the disparity map of 'this' image                       *
+*   map (Image): the map of the pixels to process.                        *
+*                                                                         *
+* Returns:                                                                *
+*   (Image): the filtered disparity map                                   *
+**************************************************************************/
+Image StereoImage::wMedianFilterAtDisparity(const Image& disp,
+		const Image& map) const {
+
+	// Definitions
+	Image out(width, height, 1);
+	std::vector<double> values;
+	std::vector<double> weights;
+
+	// Scan the whole image
+	for (size_t w = 0; w < width; ++w) {
+		for (size_t h = 0; h < height; ++h) {
+
+			// If this pixel should be filtered
+			if (map.get(w,h)) {
+
+				// Selecting a squared window around (w,h). See pixelWindowCost()
+				unsigned halfSideW = params.WINDOW_SIZE / 2;
+				unsigned halfSideH = params.WINDOW_SIZE / 2;
+				size_t minW = (w > halfSideW) ? (w - halfSideW) : 0;
+				size_t maxW = (w + halfSideW >= width) ? (width - 1) : (w + halfSideW);
+				size_t minH = (h > halfSideH) ? (h - halfSideH) : 0;
+				size_t maxH = (h + halfSideH >= height) ? (height - 1) : (h + halfSideH);
+					// NOTE: not using a resized window for simplicity
+				
+				// Accumulate the pixels values within the window
+				weights.clear();
+				values.clear();
+				for (size_t iW = minW; iW <= maxW; ++iW) {
+					for (size_t iH = minH; iH <= maxH; ++iH) {
+						weights.push_back(adaptiveWeight(w, h, iW, iH));
+						values.push_back(disp.get(iW,iH));
+					}
+				}
+
+				// Normalize the weights
+				double wSum = 0;
+				for (const double& w: weights) { wSum += w; }
+				for (double& w: weights) { w /= wSum; }
+
+				// Apply the filter
+				out(w,h) = weightedMedian(values, weights);
+
+			} else {
+
+				// Just copy
+				out(w,h) = disp.get(w,h);
+			}
+		}
+	}
+
+	return out;
+}
+
+
+/***********************************************************************
+* > processFinalDisparityMap()                                         *
+* As getDisparityMap(), this function returns the disparity map as a   *
+* grayscale image, produced by the value of each plane at the pixel's  *
+* coordinate. However, it also performs some post processing. First it *
+* calls fillInvalidPlanes(), then it calls wMedianFilterAtDisparity()  *
+* on those pixels.                                                     *
+*                                                                      *
+* Returns:                                                             *
+*   (Image): The disparity map                                         *
+***********************************************************************/
+Image StereoImage::processFinalDisparityMap(void) {
+
+	// Find the invalid pixels
+	Image invalid = getInvalidPixelsMap();
+
+	// Fill them
+	fillInvalidPlanes(invalid);
+
+	// Weighted median filter on invalid pixels
+	Image disparity = wMedianFilterAtDisparity(getDisparityMap(), invalid);
+
+	return disparity;
 }
 
 
@@ -589,7 +810,14 @@ StereoImagePair::StereoImagePair(const string& leftImgPath,
 		height(leftImg.size().second) {
 		
 	leftImg.bind(&rightImg);
+
+	if (leftImg.size() != rightImg.size()) {
+		throw std::invalid_argument(string() +
+				"StereoImagePair(). " +
+				"Left and right images must have the same dimension.");
+	}
 }
+
 
 /************************************************************************
 * > computeDisparity()                                                  *
@@ -604,9 +832,10 @@ StereoImagePair::StereoImagePair(const string& leftImgPath,
 pair<Image,Image> StereoImagePair::computeDisparity(void) {
 
 	// Random Initialization
+	logMsg("Random Initialization", 1, ' ');
 	leftImg.setRandomDisparities();
 	rightImg.setRandomDisparities();
-	logMsg("Random Initialization done", 1);
+	logMsg("done", 1);
 
 	// For each iteration
 	for (unsigned i = 0; i < params.ITERATIONS; ++i) {
@@ -658,9 +887,11 @@ pair<Image,Image> StereoImagePair::computeDisparity(void) {
 		}
 	}
 
-	// Post processing TODO
+	// Post processing
+	logMsg("Post processing" , 1);
+	Image leftDisp = leftImg.processFinalDisparityMap();
+	Image rightDisp = rightImg.processFinalDisparityMap();
 
 	// Return both disparity maps
-	return {leftImg.getDisparityMap(), rightImg.getDisparityMap()};
+	return std::make_pair(leftDisp, rightDisp);
 }
-

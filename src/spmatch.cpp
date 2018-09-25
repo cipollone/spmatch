@@ -18,6 +18,7 @@
 #include "stereo.hpp"
 
 //#define DEBUG
+//#define COUT_IMAGE_TEST
 
 
 namespace po = boost::program_options;
@@ -89,13 +90,17 @@ int main(int argc, char *argv[]) {
 			("const_disparities", po::value<bool>(&params.CONST_DISPARITIES)
 				->implicit_value(true),
 				"Always use constant planes")
+			("normalize_output", po::value<bool>(&params.NORMALIZE_OUTPUT)
+				->implicit_value(true),
+				"If true, the output map is normalized in [0,255]")
 	;
 
 	po::positional_options_description positionalOpts;
 	positionalOpts.add("inputs", 2);
 
 	po::options_description allOpts(string() + "SPMatch. " + 
-			"Stereo matching with slanted support windows (by Cipollone R.)\n" +
+			"Stereo matching with slanted support windows\n" +
+			"Implementation of Cipollone R.\n" +
 			"Usage:\n"+
 			"  spmatch <left_image> <right_image>\n");
 	allOpts.add(generalOpts).add(paramsOpts);
@@ -169,7 +174,8 @@ void setDefaults(void) {
 	params.PLANES_SATURATION = true;
 	params.USE_PSEUDORAND = false;
 	params.CONST_DISPARITIES = false;
-	params.LOG = 2;               // {0,...,3}. 0 means off
+	params.NORMALIZE_OUTPUT = true;
+	params.LOG = 1;               // {0,...,3}. 0 means off
 
 }
 
@@ -203,15 +209,24 @@ void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
 	auto disparities = stereo.computeDisparity();
 	Image& leftDisp = disparities.first;
 	Image& rightDisp = disparities.second;
+
+	// Normalization before converting to int?
+	if (params.NORMALIZE_OUTPUT) {
+		leftDisp.normalize();
+		rightDisp.normalize();
+	}
 	
 	// Write the result
-	leftDisp.setPath(leftDisparityPath);
-	leftDisp.write();
-	rightDisp.setPath(rightDisparityPath);
-	rightDisp.write();
+	leftDisp.setPath(leftDisparityPath).write();
+	rightDisp.setPath(rightDisparityPath).write();
 
-	// NOTE: just to quickly see the result
-	leftDisp.display();
+#ifdef COUT_IMAGE_TEST
+	for (size_t w = 0; w < leftDisp.size(0); ++w) {
+		for (size_t h = 0; h < leftDisp.size(1); ++h) {
+			cout << leftDisp(w,h) << ", " << rightDisp(w,h) << "\n";
+		}
+	}
+#endif // COUT_IMAGE_TEST
 }
 
 
@@ -243,25 +258,4 @@ std::istream& operator>>(std::istream& in, Params::OutOfBounds& selection) {
 
 void debugging(void) {
 
-	// Testing planeRefinement()
-	StereoImage sL("tests/cones-small/im2.png", StereoImage::LEFT);
-	StereoImage sR("tests/cones-small/im6.png", StereoImage::RIGHT);
-	sL.bind(&sR);
-	sL.setRandomDisparities();
-	auto dim = sL.size();
-
-	for (unsigned i = 0; i < params.ITERATIONS; ++i) {
-		cout << "Iteration " << i << endl;
-		for (size_t w = 0; w < dim.first; ++w) {
-			for (size_t h = 0; h < dim.second; ++h) {
-				sL.planeRefinement(w, h);
-			}
-			cout << w << " " << endl;
-		}
-	}
-
-	Image disparity = sL.getDisparityMap();
-	disparity.display();
-	disparity.setPath("test.png");
-	disparity.write();
 }

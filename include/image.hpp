@@ -4,7 +4,6 @@
 #include <string>
 
 #include "geometry.hpp"
-#include "utils.hpp"
 
 #include <CImg.h>         // NOTE: including this before geometry.hpp
                           // (therefore Eigen) results in a compilation error
@@ -54,8 +53,8 @@ class Image {
 		Image toGrayscale(void) const;
 
 		// methods
-		void setPath(const string& path) { imgPath = path; }
-		void normalize(void) { img.normalize(0, 255); }
+		Image& setPath(const string& path) { imgPath = path; return *this; }
+		Image& normalize(void) { img.normalize(0, 255); return *this; }
 
 		// operators
 		Image& operator=(const Image&) = delete;
