@@ -34,3 +34,7 @@ spmatch <left-image> <right-image>
 The left and right images must be RGB images.  The result is a new image,
 "disparity.png", with the computed disparity. Run `spmatch --help` for a
 list of all available options.
+
+The disparity image is normalized in the range [0,255] so to limit the
+errors caused by quantization. However the original disparity will be written
+in \*.csv text files.

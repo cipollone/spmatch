@@ -11,6 +11,7 @@
 
 #include <string>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <boost/program_options.hpp>
 
@@ -18,7 +19,6 @@
 #include "stereo.hpp"
 
 //#define DEBUG
-//#define COUT_IMAGE_TEST
 
 
 namespace po = boost::program_options;
@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
 	generalOpts.add_options()
 			("help,h", "Help")
 			("output,o", po::value<string>(&outputPath)->default_value(
-				"disparity.png"), "Output file")
+				"disparity.png"), "The path/name of the output files")
 			("inputs,I", po::value<std::vector<string>>(&inputImages)
 				->multitoken()->required(), "Left and right images")
 			("log,l", po::value<int>(&params.LOG), "Log level {0,...,3}")
@@ -90,9 +90,6 @@ int main(int argc, char *argv[]) {
 			("const_disparities", po::value<bool>(&params.CONST_DISPARITIES)
 				->implicit_value(true),
 				"Always use constant planes")
-			("normalize_output", po::value<bool>(&params.NORMALIZE_OUTPUT)
-				->implicit_value(true),
-				"If true, the output map is normalized in [0,255]")
 	;
 
 	po::positional_options_description positionalOpts;
@@ -174,33 +171,44 @@ void setDefaults(void) {
 	params.PLANES_SATURATION = true;
 	params.USE_PSEUDORAND = false;
 	params.CONST_DISPARITIES = false;
-	params.NORMALIZE_OUTPUT = true;
 	params.LOG = 1;               // {0,...,3}. 0 means off
 
 }
 
 
-/*************************************************************************
-* > writeDisparityMap()                                                  *
-* Given a pair of stereo images, saves the generated disparity maps of   *
-* the left and right view to the ouput path. The image will be saved as: *
-* <disparityPath_name>L.<disparityPath_ext>                              *
-* <disparityPath_name>R.<disparityPath_ext>                              *
-*                                                                        *
-* Args:                                                                  *
-*   leftImgPath (string): left image name/path                           *
-*   rightImgPath (string): right image name/path                         *
-*   disparityPath (string): output image name/path                       *
-*************************************************************************/
+/**************************************************************************
+* > writeDisparityMap()                                                   *
+* Given a pair of stereo images, saves the generated disparity maps of    *
+* the left and right view to the ouput path. The image will be saved as:  *
+* <disparityPath_name>L.<disparityPath_ext>                               *
+* <disparityPath_name>R.<disparityPath_ext>                               *
+* It also writes two text files with the floating point value of the      *
+* disparity at each pixel, in the following two files:                    *
+* <disparityPath_name>L.csv                                               *
+* <disparityPath_name>R.csv                                               *
+* They have the format:                                                   *
+* p_w, p_h,    disparity                                                  *
+* ...                                                                     *
+* NOTE: no try blocks                                                     *
+*                                                                         *
+* Args:                                                                   *
+*   leftImgPath (string): left image name/path                            *
+*   rightImgPath (string): right image name/path                          *
+*   disparityPath (string): output name/path of the images and text files *
+**************************************************************************/
 void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
 		const string& disparityPath) {
 
-	// Set the path
+	// Set the paths
 	auto extPos = disparityPath.rfind('.');
 	string leftDisparityPath = disparityPath;
 	string rightDisparityPath = disparityPath;
+	string leftDisparityTextPath = disparityPath;
+	string rightDisparityTextPath = disparityPath;
 	leftDisparityPath.insert(extPos, "L");
 	rightDisparityPath.insert(extPos, "R");
+	leftDisparityTextPath.replace(extPos, 10, "L.csv");
+	rightDisparityTextPath.replace(extPos, 10, "R.csv");
 
 	// Read the two stereo images
 	StereoImagePair stereo(leftImgPath, rightImgPath);
@@ -210,23 +218,27 @@ void writeDisparityMap(const string& leftImgPath, const string& rightImgPath,
 	Image& leftDisp = disparities.first;
 	Image& rightDisp = disparities.second;
 
-	// Normalization before converting to int?
-	if (params.NORMALIZE_OUTPUT) {
-		leftDisp.normalize();
-		rightDisp.normalize();
-	}
-	
-	// Write the result
-	leftDisp.setPath(leftDisparityPath).write();
-	rightDisp.setPath(rightDisparityPath).write();
-
-#ifdef COUT_IMAGE_TEST
+	// Write to text files
+	std::ofstream leftDispCsv(leftDisparityTextPath);
+	std::ofstream rightDispCsv(rightDisparityTextPath);
 	for (size_t w = 0; w < leftDisp.size(0); ++w) {
 		for (size_t h = 0; h < leftDisp.size(1); ++h) {
-			cout << leftDisp(w,h) << ", " << rightDisp(w,h) << "\n";
+			leftDispCsv << w << ", " << h << ", " << std::setprecision(8) <<
+					leftDisp.get(w,h) << "\n";
+			rightDispCsv << w << ", " << h << ", " << std::setprecision(8) <<
+					rightDisp.get(w,h) << "\n";
 		}
 	}
-#endif // COUT_IMAGE_TEST
+	leftDispCsv.close();
+	rightDispCsv.close();
+
+	// Normalization before converting to uint8
+	leftDisp.normalize();
+	rightDisp.normalize();
+	
+	// Write the result to image
+	leftDisp.setPath(leftDisparityPath).write();
+	rightDisp.setPath(rightDisparityPath).write();
 }
 
 
