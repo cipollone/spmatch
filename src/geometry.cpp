@@ -202,7 +202,23 @@ const double PlaneFunction::Z_EPS = 0.01;
 *   a (double), b (double), c (double): the three parameters               *
 ***************************************************************************/
 PlaneFunction::PlaneFunction(double a, double b, double c):
-		Plane(a,b,-1,c) {}
+		Plane(a,b,-1,c) {
+		
+	updateFunParams();
+}
+
+
+/******************************************************************************
+* > updateFunParams()                                                         *
+* Updates the fAbc parameters to match with the function representation       *
+* of the plane {abc, d}. This must be called every time the plane is changed. *
+* NOTE: it assumes the plane parameters represents a function (see            *
+* areFunctionParams().                                                        *
+******************************************************************************/
+void PlaneFunction::updateFunParams(void) {
+	double c = abc(2);   // NOTE: assuming  c != 0
+	fAbc = { -abc(0)/c, -abc(1)/c, -d/c };
+}
 
 
 /*****************************************************************************
@@ -211,9 +227,8 @@ PlaneFunction::PlaneFunction(double a, double b, double c):
 *   (Vector3d): the parameters with the function notation (slope x, slope y, *
 *       constant).                                                           *
 *****************************************************************************/
-Vector3d PlaneFunction::getFunParams() const {
-	double c = abc(2);   // NOTE: assuming  c != 0
-	return { -abc(0)/c, -abc(1)/c, -d/c };
+const Vector3d& PlaneFunction::getFunParams() const {
+	return fAbc;
 }
 
 
@@ -237,6 +252,8 @@ PlaneFunction& PlaneFunction::setPlane(const Vector3d& abc, double d) {
 				"setPlane(). The input vector do not represent a function. z = " +
 				std::to_string(std::abs(this->abc(2))) + " < Z_EPS) ");
 	}
+
+	updateFunParams();
 
 	return *this;
 }
@@ -267,6 +284,8 @@ PlaneFunction& PlaneFunction::setRandomPlane(double d1, double d2) {
 	std::uniform_real_distribution<double> uniform(d1, d2);
 	auto& rand = RandomDevice::getGenerator();
 	d = uniform(rand.engine);
+
+	updateFunParams();
 
 	return *this;
 }
@@ -326,7 +345,7 @@ PlaneFunction& PlaneFunction::setRandomFunction(double x, double y,
 
 
 /*************************************************************************
-* > setNeighbourFunction()                                               *
+* > getNeighbourFunction()                                               *
 * Returns a plane as a random function in a neighbourhood of the         *
 * given one. "In a neighbourhood" means that: its value at point         *
 * (x,y) will be at most 'deltaZ' far from the current value; the normal  *
@@ -443,6 +462,8 @@ PlaneFunction& PlaneFunction::fromPointAndNorm(const Vector3d& point,
 				std::to_string(std::abs(this->abc(2))) + " < Z_EPS) ");
 	}
 
+	updateFunParams();
+
 	return *this;
 
 }
@@ -461,16 +482,15 @@ PlaneFunction& PlaneFunction::fromPointAndNorm(const Vector3d& point,
 *******************************************************************************/
 double PlaneFunction::operator()(double x, double y) const {
 
-	Vector3d coeffs(getFunParams());
 	Vector3d point = { x, y, 1};
 
-	return coeffs.dot(point);
+	return fAbc.dot(point);
 }
 
 
 // print
 std::ostream& operator<<(std::ostream& out, const PlaneFunction& p) {
-	return out << "{ " << p.getFunParams().transpose() << " }";
+	return out << "{ " << p.fAbc.transpose() << " }";
 }
 
 

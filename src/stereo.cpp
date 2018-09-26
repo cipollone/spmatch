@@ -122,7 +122,6 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 		case RIGHT: sign = +1; break;
 	}
 	double qW = w + sign * d;
-	double qH = h;
 
 	// Is (qW, qH) out of the image?
 	bool qIsOut = false;
@@ -136,7 +135,7 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 				return std::numeric_limits<double>::quiet_NaN();
 			case Params::OutOfBounds::ERROR:
 				throw std::range_error("pixelDissimilarity(). The pixel (" +
-						to_string(qW) + ", " + to_string(qH) +
+						to_string(qW) + ", " + to_string(h) +
 						") in the other view is out of bounds");
 			case Params::OutOfBounds::REPEAT_PIXEL:
 				qIsOut = false;		// false means solved; no 'break;' here
@@ -154,11 +153,11 @@ double StereoImage::pixelDissimilarity(size_t w, size_t h,
 	double pGrY = gradientY.get(w,h);
 
 	// Colour and gradient of the other pixel
-	double qR = other->image.at(qW,qH,0);
-	double qG = other->image.at(qW,qH,1);
-	double qB = other->image.at(qW,qH,2);
-	double qGrX = other->gradientX.at(qW,qH,0);
-	double qGrY = other->gradientY.at(qW,qH,0);
+	double qR = other->image.atH(qW,h,0);
+	double qG = other->image.atH(qW,h,1);
+	double qB = other->image.atH(qW,h,2);
+	double qGrX = other->gradientX.atH(qW,h,0);
+	double qGrY = other->gradientY.atH(qW,h,0);
 
 	// Is (qW, qH) out of the image?
 	if (qIsOut && params.OUT_OF_BOUNDS == Params::OutOfBounds::BLACK_PIXEL) {
@@ -533,8 +532,7 @@ bool StereoImage::planeRefinement(size_t w, size_t h) {
 	double deltaZ = (params.MAX_D - params.MIN_D) / 2;
 	double deltaAng = 89;		// < 90° in any direction
 	
-	double thisCost;
-	bool recomputeThisCost = true;  // for efficiency
+	double thisCost = pixelWindowCost(w, h, disparityPlanes.get(w, h));
 
 	// Try different planes. Stop with a threshold
 	while (deltaZ > 0.1) {
@@ -553,16 +551,11 @@ bool StereoImage::planeRefinement(size_t w, size_t h) {
 		} while (std::abs(sampledPlane.getParams().first(2)) <
 				std::cos(params.MAX_SLOPE));
 
-		// Set if the new one has lower cost
-		if (recomputeThisCost) {
-			thisCost = pixelWindowCost(w, h, disparityPlanes.get(w, h));
-			recomputeThisCost = false;
-		}
 		double sampledCost = pixelWindowCost(w, h, sampledPlane);
 		if (sampledCost < thisCost) {
 			plane = sampledPlane;  // this is a ref: modifies disparityPlanes
 			modified = true;
-			recomputeThisCost = true;
+			thisCost = sampledCost;
 		}
 
 		// Half range

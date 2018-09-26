@@ -47,6 +47,7 @@ class Image {
 		double get(size_t w, size_t h, size_t c) const { return img(w,h,0,c); }
 		double get(size_t w, size_t h) const { return img(w,h); }
 		double at(double w, double h, size_t c) const;
+		double atH(double w, size_t h, size_t c) const;
 		const CImg<double>& getCImg(void) const { return img; }
 		void display(void) const { img.display(); }
 		void write(void) const { img.save(imgPath.c_str()); }

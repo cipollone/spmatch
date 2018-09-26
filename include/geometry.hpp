@@ -62,6 +62,15 @@ class Plane {
 *************************************************************************/
 class PlaneFunction: public Plane {
 
+	private:
+
+		Vector3d fAbc;    // Function params. Added for to speed up operator()
+	
+	private:
+
+		// private method
+		void updateFunParams(void);
+
 	public:
 
 		static const double Z_EPS;
@@ -71,7 +80,7 @@ class PlaneFunction: public Plane {
 		PlaneFunction(double a, double b, double c);
 
 		// const methods
-		Vector3d getFunParams(void) const;
+		const Vector3d& getFunParams(void) const;
 		PlaneFunction getNeighbourFunction(double x, double y,
 				double deltaZ, double deltaAng) const;
 		PlaneFunction getNeighbourFunction(double x, double y,

@@ -99,12 +99,20 @@ size_t Image::size(unsigned dim) const {
 }
 
 
-/**************************************************************************
-* > at()                                                                  *
-* Returns the intensity of the c channel. The result is obtained with     *
-* bilinear interpolation in the x,y directions. NOTE: bounds are checked. *
-* For fast, discrete lookup, use the () operator.                         *
-**************************************************************************/
+/**********************************************************************
+* > at()                                                              *
+* Returns the intensity of the c channel. The result is obtained with *
+* bilinear interpolation in the x,y directions.                       *
+* For fast, discrete lookup, use the () operator.                     *
+*                                                                     *
+* Args:                                                               *
+*   w (double): a continuous coordinate in the x direction            *
+*   h (double): a continuous coordinate in the y direction            *
+*   c (size_t): the channel to read                                   *
+*                                                                     *
+* Return:                                                             *
+*   (double): the interpolated intensity                              *
+**********************************************************************/
 double Image::at(double w, double h, size_t c) const {
 
 	// checks
@@ -138,6 +146,39 @@ double Image::at(double w, double h, size_t c) const {
 			z10 * x * (1 - y) + 
 			z01 * (1 - x) * y + 
 			z11 * x * y;
+	return z;
+}
+
+
+/**********************************************************************
+* > atH()                                                             *
+* Returns the intensity of the c channel. The result is obtained with *
+* linear interpolation in the horizontal direction.                   *
+* NOTE: bounds are not checked.                                       *
+* For fast, discrete lookup, use the () operator.                     *
+* For bilinear interpolation use at().                                *
+*                                                                     *
+* Args:                                                               *
+*   w (double): a continuous coordinate in the x direction            *
+*   h (size_t): the line to read                                      *
+*   c (size_t): the channel to read                                   *
+*                                                                     *
+* Return:                                                             *
+*   (double): the interpolated intensity                              *
+**********************************************************************/
+double Image::atH(double w, size_t h, size_t c) const {
+
+	// Get extremes
+	size_t wLow = std::floor(w);
+	size_t wHigh = std::ceil(w);
+	double x = w - wLow;
+
+	double z0 = img(wLow, h, c);
+	double z1 = img(wHigh, h, c);
+
+	// linear
+	double z = z0 * (1 - x) + z1 * x;
+
 	return z;
 }
 
