@@ -152,13 +152,13 @@ int main(int argc, char *argv[]) {
 void setDefaults(void) {
 
 	// Math constants
-	params.ALFA = 0.4;
+	params.ALFA = 0.5;
 	params.TAU_COL = 60;
 	params.TAU_GRAD = 30;
 	params.GAMMA = 15;
 
 	// Range parameters
-	params.WINDOW_SIZE = 15;      // NOTE: Must be an odd number
+	params.WINDOW_SIZE = 35;      // NOTE: Must be an odd number
 	params.MIN_D = 0;
 	params.MAX_D = 70;            // NOTE: must be positive
 	params.ITERATIONS = 3;

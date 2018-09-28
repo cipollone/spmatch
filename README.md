@@ -1,21 +1,16 @@
 # SPMatch, a PatchMatch Stereo implementation
 
-This is a basic implementation the PatchMatch algorithm for stereo reconstruction.
-
+This is a simple implementation of the PatchMatch algorithm for stereo reconstruction.
 The algorithm is described in:
-Michael Bleyer, Christoph Rhemann and Carsten Rother. *PatchMatch Stereo -
-Stereo Matching with Slanted Support Windows*. In Jesse Hoey, Stephen McKenna
-and Emanuele Trucco, Proceedings of the British Machine Vision Conference,
-pages 14.1-14.11. BMVA Press, September 2011.
+Michael Bleyer, Christoph Rhemann and Carsten Rother. *PatchMatch Stereo - Stereo Matching with Slanted Support Windows*. In Jesse Hoey, Stephen McKenna and Emanuele Trucco, Proceedings of the British Machine Vision Conference, pages 14.1-14.11. BMVA Press, September 2011.
 
 ## Dependencies:
-* libboost (1.62)
+* libboost-program-options-dev (1.62)
 * cimg-dev (1.7.9)
 * imagemagick (8:6.9.7)
 * libeigen3-dev (3.3.2)
 
-The version numbers are the ones that have been used. Any future version with
-the same API is fine.
+The version numbers are the ones that have been used. Any future version with the same API is fine.
 
 ## Build:
 First install all the dependencies. Then, you can build using CMake, as:
@@ -31,10 +26,11 @@ Run:
 ```
 spmatch <left-image> <right-image>
 ```
-The left and right images must be RGB images.  The result is a new image,
-"disparity.png", with the computed disparity. Run `spmatch --help` for a
-list of all available options.
+The left and right images must be RGB images. The outputs are two new images, "disparityL.<ext>" and "disparityR.<ext>", with the computed disparity map from the two views. These images are nomalized in [0,255], because they are just visual representations of the result.
+The actual disparity will be written in two other files: "disparityL.csv" and "disparityR.csv". The format of each line is:
+```
+<p_w>, <p_h>, <disparity>
+```
+This means that the disparity value of pixel (p_w, p_h)  is given by the real number "disparity".
 
-The disparity image is normalized in the range [0,255] so to limit the
-errors caused by quantization. However the original disparity will be written
-in \*.csv text files.
+There are many options available. Run `spmatch --help` for alist of all available options. Some of them (e.g. -i and -w) affect excecution time and accuracy.
