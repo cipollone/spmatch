@@ -4,6 +4,8 @@ This is a simple implementation of the PatchMatch algorithm for stereo reconstru
 The algorithm is described in:
 Michael Bleyer, Christoph Rhemann and Carsten Rother. *PatchMatch Stereo - Stereo Matching with Slanted Support Windows*. In Jesse Hoey, Stephen McKenna and Emanuele Trucco, Proceedings of the British Machine Vision Conference, pages 14.1-14.11. BMVA Press, September 2011.
 
+This software closely follows the description of this paper. This is not an efficient implementation. There are some differences, however, in the Random Initialization and Plane Refinement steps. These changes allow to sample versors with uniform distribution in the required domains.
+
 ## Dependencies:
 * libboost-program-options-dev (1.62)
 * cimg-dev (1.7.9)
